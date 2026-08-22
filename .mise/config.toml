@@ -1,0 +1,69 @@
+[tools]
+go = "1.27.0"
+"go:golang.org/x/vuln/cmd/govulncheck" = "1.7.0"
+golangci-lint = "2.13.1"
+lefthook = "2.1.11"
+actionlint = "1.7.12"
+zizmor = "1.29.0"
+oxfmt = "0.64.0"
+"npm:@commitlint/cli" = "21.2.2"
+
+[settings]
+experimental = true
+pin = true
+lockfile = true
+
+[tasks.deps]
+description = "Install dependencies"
+run = "go mod download"
+
+[tasks.build]
+description = "Build application"
+run = "go build -o snipe-sync ./cmd/snipe-sync"
+
+[tasks.tidy]
+description = "Tidy the Go module"
+run = "go mod tidy"
+
+[tasks.tidy-check]
+description = "Check the Go module is tidy"
+run = "go mod tidy -diff"
+
+[tasks.vulncheck]
+description = "Scan for known vulnerabilities with govulncheck"
+run = "govulncheck ./..."
+
+[tasks.generate]
+description = "Generate committed artifacts"
+run = "go generate ./internal/config"
+
+[tasks.test]
+description = "Run dependency-free Go checks"
+run = ["go vet ./...", "go test -race -count=1 ./..."]
+
+[tasks.lint-fix]
+description = "Run linters and apply fixes"
+run = "golangci-lint run --fix"
+
+[tasks.lint]
+description = "Run linters"
+run = "golangci-lint run"
+
+[tasks.format]
+description = "Format Go code"
+run = "go fmt ./..."
+
+[tasks.fmt-check]
+description = "Check Go formatting"
+run = "test -z \"$(gofmt -l .)\" || { gofmt -l .; exit 1; }"
+
+[tasks.workflow-lint]
+description = "Lint GitHub Actions workflows"
+run = ["actionlint", "zizmor --offline --no-ignores .github/workflows"]
+
+[tasks.clean]
+description = "Remove local build outputs"
+run = "rm -f snipe-sync coverage.out && rm -rf dist"
+
+[hooks]
+postinstall = "lefthook install"

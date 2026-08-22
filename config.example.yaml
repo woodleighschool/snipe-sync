@@ -1,0 +1,73 @@
+# yaml-language-server: $schema=./snipe-sync.schema.json
+version: 1
+
+connections:
+  microsoft:
+    type: microsoft_graph
+    tenant_id: ${MICROSOFT_TENANT_ID}
+    client_id: ${MICROSOFT_CLIENT_ID}
+    client_secret: ${MICROSOFT_CLIENT_SECRET}
+
+  jamf:
+    type: jamf
+    url: ${JAMF_URL}
+    client_id: ${JAMF_CLIENT_ID}
+    client_secret: ${JAMF_CLIENT_SECRET}
+
+  snipe:
+    type: snipeit
+    url: ${SNIPEIT_URL}
+    api_key: ${SNIPEIT_API_KEY}
+
+identity:
+  name: entra
+  type: entra
+  connection: microsoft
+  domains:
+    - example.invalid
+  groups:
+    main_campus:
+      - 00000000-0000-0000-0000-000000000001
+
+devices:
+  - name: intune
+    type: intune
+    connection: microsoft
+    priority: 100
+    managed_by: Intune
+
+  - name: jamf
+    type: jamf
+    connection: jamf
+    priority: 50
+    managed_by: Jamf
+
+target:
+  type: snipeit
+  connection: snipe
+  timezone: Australia/Melbourne
+
+users:
+  include_when: user.present
+  location:
+    cases:
+      - when: '"main_campus" in user.groups'
+        value: Main Campus
+  absent:
+    department: Disabled
+
+assets:
+  manufacturers:
+    - Example Computers
+  statuses:
+    writable:
+      - Ready to Deploy
+    promote:
+      from:
+        - Stock
+      to: Ready to Deploy
+  managed_by_field: Managed By
+  assignment:
+    shared_when: device.name.matches("(?i)(^|-)SHARED(-|$)")
+  absent:
+    enabled: true

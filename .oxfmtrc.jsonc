@@ -1,0 +1,4 @@
+{
+  "ignorePatterns": ["snipe-sync.schema.json"],
+  "printWidth": 100,
+}

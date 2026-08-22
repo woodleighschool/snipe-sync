@@ -1,0 +1,328 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/woodleighschool/snipe-sync/main/snipe-sync.schema.json",
+  "$ref": "#/$defs/Config",
+  "$defs": {
+    "AssetAbsent": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AssetPolicy": {
+      "properties": {
+        "manufacturers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "statuses": {
+          "$ref": "#/$defs/AssetStatuses"
+        },
+        "managed_by_field": {
+          "type": "string"
+        },
+        "assignment": {
+          "$ref": "#/$defs/AssignmentPolicy"
+        },
+        "absent": {
+          "$ref": "#/$defs/AssetAbsent"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "manufacturers",
+        "statuses",
+        "managed_by_field"
+      ]
+    },
+    "AssetStatuses": {
+      "properties": {
+        "writable": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "promote": {
+          "$ref": "#/$defs/StatusPromotion"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "writable"
+      ]
+    },
+    "AssignmentPolicy": {
+      "properties": {
+        "shared_when": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Config": {
+      "properties": {
+        "version": {
+          "type": "integer",
+          "enum": [
+            1
+          ]
+        },
+        "connections": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Connection"
+          },
+          "type": "object"
+        },
+        "identity": {
+          "$ref": "#/$defs/Identity"
+        },
+        "devices": {
+          "items": {
+            "$ref": "#/$defs/DeviceSource"
+          },
+          "type": "array",
+          "minItems": 1
+        },
+        "target": {
+          "$ref": "#/$defs/Target"
+        },
+        "users": {
+          "$ref": "#/$defs/UserPolicy"
+        },
+        "assets": {
+          "$ref": "#/$defs/AssetPolicy"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "version",
+        "connections",
+        "identity",
+        "devices",
+        "target",
+        "users",
+        "assets"
+      ]
+    },
+    "Connection": {
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "microsoft_graph",
+            "jamf",
+            "snipeit"
+          ]
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type"
+      ]
+    },
+    "DeviceSource": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "intune",
+            "jamf"
+          ]
+        },
+        "connection": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "managed_by": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "type",
+        "connection",
+        "priority"
+      ]
+    },
+    "Identity": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "entra"
+          ]
+        },
+        "connection": {
+          "type": "string"
+        },
+        "domains": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "groups": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "type",
+        "connection",
+        "domains"
+      ]
+    },
+    "LocationCase": {
+      "properties": {
+        "when": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "when",
+        "value"
+      ]
+    },
+    "LocationPolicy": {
+      "properties": {
+        "cases": {
+          "items": {
+            "$ref": "#/$defs/LocationCase"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "StatusPromotion": {
+      "properties": {
+        "from": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Target": {
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "snipeit"
+          ]
+        },
+        "connection": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type",
+        "connection",
+        "timezone"
+      ]
+    },
+    "UserAbsent": {
+      "properties": {
+        "department": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "department"
+      ]
+    },
+    "UserPolicy": {
+      "properties": {
+        "include_when": {
+          "type": "string"
+        },
+        "location": {
+          "$ref": "#/$defs/LocationPolicy"
+        },
+        "absent": {
+          "$ref": "#/$defs/UserAbsent"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "absent"
+      ]
+    }
+  },
+  "title": "SnipeSync configuration",
+  "description": "Provider connections and typed Snipe-IT reconciliation policy."
+}

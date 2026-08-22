@@ -1,0 +1,46 @@
+# Go binaries and test artifacts
+*.exe
+*.dll
+*.dylib
+*.test
+*.out
+
+# Build and tool outputs
+/snipe-sync
+/bin/
+/dist/
+/tmp/
+/.gocache/
+coverage.out
+
+# Go workspace overrides
+go.work
+go.work.sum
+/vendor/
+
+# Local Mise overrides
+.mise.local.toml
+.mise.local.lock
+
+# Local configuration
+.env
+.env.*
+!.env.example
+config.yml
+config.yaml
+
+# Editor and IDE
+.vscode/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk

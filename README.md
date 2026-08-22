@@ -32,7 +32,7 @@ docker run --rm \
   --config /config.yaml
 ```
 
-Apply mode writes structured JSON logs to stderr. Changes, failures, and cycle summaries use the default `info` level; unchanged and skipped items are available with `--log-level debug`.
+Daemon mode writes structured JSON to stderr. Lifecycle and material reconciliation events use `info`, warnings and failures use `warn` or `error`, and successful cycle summaries plus routine no-op evaluations use `debug`.
 
 ## ⚙️ Configuration
 

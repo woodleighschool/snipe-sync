@@ -323,6 +323,6 @@
       ]
     }
   },
-  "title": "SnipeSync configuration",
+  "title": "Configuration",
   "description": "Provider connections and typed Snipe-IT reconciliation policy."
 }

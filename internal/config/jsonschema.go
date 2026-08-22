@@ -13,7 +13,7 @@ func JSONSchema() *jsonschema.Schema {
 	reflector := &jsonschema.Reflector{FieldNameTag: "yaml"}
 	schema := reflector.Reflect(&Config{})
 	schema.ID = jsonschema.ID("https://raw.githubusercontent.com/woodleighschool/snipe-sync/main/snipe-sync.schema.json")
-	schema.Title = "SnipeSync configuration"
+	schema.Title = "Configuration"
 	schema.Description = "Provider connections and typed Snipe-IT reconciliation policy."
 	return schema
 }

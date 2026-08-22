@@ -1,4 +1,4 @@
-// Package expression compiles the typed CEL policy surface used by SnipeSync.
+// Package expression compiles the typed CEL policy surface used by the service.
 package expression
 
 import (
@@ -25,7 +25,7 @@ const (
 	assetScope
 )
 
-// Compiler validates policy expressions against SnipeSync's typed domain.
+// Compiler validates policy expressions against the typed domain.
 type Compiler struct {
 	environment *cel.Env
 	scope       scope

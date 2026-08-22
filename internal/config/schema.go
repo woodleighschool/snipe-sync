@@ -1,9 +1,9 @@
-// Package config loads and validates SnipeSync's versioned YAML policy.
+// Package config loads and validates the versioned YAML policy.
 package config
 
 import "github.com/woodleighschool/snipe-sync/internal/expression"
 
-// Config is SnipeSync's complete versioned configuration.
+// Config is the complete versioned configuration.
 type Config struct {
 	Version     int                   `yaml:"version"     jsonschema:"enum=1"`
 	Connections map[string]Connection `yaml:"connections" jsonschema:"minProperties=1"`

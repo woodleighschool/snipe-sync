@@ -2,7 +2,7 @@
 
 Reconciles Microsoft Entra users and managed devices from Intune and Jamf Pro into Snipe-IT from one YAML policy.
 
-`snipe-sync` reads every configured source, builds one deterministic plan, and only writes that exact plan when explicitly run with `run --once`.
+The command builds one deterministic plan from authoritative provider state and only writes that exact plan when run in apply mode.
 
 > [!WARNING]
 > This project may be unstable or have bugs, use with caution.

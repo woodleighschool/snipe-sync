@@ -1,4 +1,4 @@
-# AGENTS.md: snipe-sync
+# AGENTS.md
 
 Guidance for agents and humans working in this repository. This file is self-contained. Check the repository's source, Mise configuration, Lefthook configuration, and workflows for facts that can vary instead of copying versions or commands from another project.
 
@@ -16,12 +16,16 @@ Guidance for agents and humans working in this repository. This file is self-con
 - Keep operations idempotent. Re-running a command, generator, reconciler, or migration with identical input shouldn't accumulate side effects.
 - Stay DRY and minimal without premature abstraction. Three similar call sites are fine; add a helper, interface, options type, or generic abstraction when real callers need the variance it provides.
 - Comments explain non-obvious constraints, invariants, and external requirements. Names and structure carry the ordinary narrative.
+- Do not add file banners, author or date headers, or comment-based change logs. Git owns provenance and history.
+- Write prose from the repository's point of view. Use `we` and `our` for the organisation, and `the app`, `the service`, `the command`, or direct wording for this repository. Omit organisation and product names when context already identifies them; keep names that are identifiers or distinguish an external system.
+- Keep tracked documentation durable and present-tense. READMEs use a terse introduction and the relevant established emoji-led sections; omit migration history, temporary setup state, and inventories of absent features.
+- Keep one-time local and external-service setup notes out of tracked files. If asked to preserve them locally, leave them untracked without adding ignore or exclude rules.
 - Tests protect behaviour and contracts at the lowest useful boundary. Use realistic synthetic inputs and add regression coverage for plausible failures rather than implementation shape.
 
 ## Repository tooling
 
 - Mise owns tools and commands. Run `mise tasks` and read `.mise/config.toml` before choosing task names or invoking bare tools.
-- Lefthook extends the shared Woodleigh configuration. Read `.lefthook.toml` and use `lefthook dump` when merged hook behaviour matters; local hooks contain only repository-specific additions.
+- Lefthook extends the shared organisation configuration. Read `.lefthook.toml` and use `lefthook dump` when merged hook behaviour matters; local hooks contain only repository-specific additions.
 - Run focused checks while working, then the relevant repository format, lint, test, build, generation, workflow, packaging, and security tasks before calling the work complete.
 - Treat generated files, schemas, lockfiles, release metadata, and package assets as part of the contract that produces them.
 

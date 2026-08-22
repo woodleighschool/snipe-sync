@@ -2,8 +2,15 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"maps"
+	"sort"
+	"strings"
+	"sync"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/woodleighschool/snipe-sync/internal/config"
 	"github.com/woodleighschool/snipe-sync/internal/domain"
@@ -11,8 +18,6 @@ import (
 	"github.com/woodleighschool/snipe-sync/internal/provider/microsoft"
 	"github.com/woodleighschool/snipe-sync/internal/provider/snipe"
 )
-
-const groupLookupConcurrency = 8
 
 // Build creates provider clients and a service from validated configuration.
 func Build(cfg *config.Config) (*Service, error) {
@@ -55,7 +60,7 @@ func Build(cfg *config.Config) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	identity := &entraSource{client: identityClient, domains: cfg.Identity.Domains, groups: cfg.Identity.Groups}
+	identity := newEntraSource(identityClient, cfg.Identity.Domains, cfg.Identity.Groups)
 	sources := make([]DeviceSource, 0, len(cfg.Devices))
 	for _, source := range cfg.Devices {
 		switch source.Type {
@@ -83,19 +88,147 @@ func Build(cfg *config.Config) (*Service, error) {
 	return New(cfg, identity, sources, &snipeTarget{client: targetClient})
 }
 
+type entraClient interface {
+	ListEntraUserDelta(context.Context, string) (microsoft.EntraUserDelta, error)
+	ListEntraGroupUserIDs(context.Context, string) ([]string, error)
+}
+
 type entraSource struct {
-	client  *microsoft.Client
-	domains []string
-	groups  map[string][]string
+	mu        sync.Mutex
+	client    entraClient
+	domains   map[string]struct{}
+	groups    map[string][]string
+	users     map[string]domain.User
+	deltaLink string
+}
+
+func newEntraSource(client entraClient, domains []string, groups map[string][]string) *entraSource {
+	domainSet := make(map[string]struct{}, len(domains))
+	for _, value := range domains {
+		domainSet[strings.ToLower(strings.TrimSpace(value))] = struct{}{}
+	}
+	return &entraSource{
+		client: client, domains: domainSet, groups: groups,
+		users: make(map[string]domain.User),
+	}
 }
 
 func (s *entraSource) ListUsers(ctx context.Context) ([]domain.User, []string, error) {
-	users, enrichmentWarnings, err := s.client.ListEntraUsers(ctx, s.domains, s.groups, groupLookupConcurrency)
-	warnings := make([]string, len(enrichmentWarnings))
-	for index, warning := range enrichmentWarnings {
-		warnings[index] = warning.Error()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delta, err := s.client.ListEntraUserDelta(ctx, s.deltaLink)
+	reset := s.deltaLink == ""
+	if errors.Is(err, microsoft.ErrDeltaExpired) {
+		delta, err = s.client.ListEntraUserDelta(ctx, "")
+		reset = true
 	}
-	return users, warnings, err
+	if err != nil {
+		return nil, nil, err
+	}
+
+	usersByID := make(map[string]domain.User, len(s.users)+len(delta.Changes))
+	if !reset {
+		maps.Copy(usersByID, s.users)
+	}
+	for _, change := range delta.Changes {
+		if change.Removed || !s.includes(change.User) {
+			delete(usersByID, change.User.ID)
+			continue
+		}
+		usersByID[change.User.ID] = change.User
+	}
+
+	groupsByUserID, err := s.listGroups(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	users := make([]domain.User, 0, len(usersByID))
+	for id, user := range usersByID {
+		user.Groups = append([]string(nil), groupsByUserID[id]...)
+		user.GroupsComplete = true
+		usersByID[id] = user
+		users = append(users, user)
+	}
+	sort.Slice(users, func(left, right int) bool {
+		return users[left].UserPrincipalName < users[right].UserPrincipalName
+	})
+
+	s.users = usersByID
+	s.deltaLink = delta.DeltaLink
+	return users, nil, nil
+}
+
+func (s *entraSource) includes(user domain.User) bool {
+	if user.UserPrincipalName == "" || strings.Contains(user.UserPrincipalName, "#ext#") || user.GivenName == "" {
+		return false
+	}
+	separator := strings.LastIndexByte(user.UserPrincipalName, '@')
+	if separator < 0 {
+		return false
+	}
+	_, ok := s.domains[user.UserPrincipalName[separator+1:]]
+	return ok
+}
+
+func (s *entraSource) listGroups(ctx context.Context) (map[string][]string, error) {
+	aliasesByGroupID := make(map[string][]string)
+	for alias, groupIDs := range s.groups {
+		for _, groupID := range groupIDs {
+			groupID = strings.TrimSpace(groupID)
+			aliasesByGroupID[groupID] = append(aliasesByGroupID[groupID], alias)
+		}
+	}
+	groupIDs := make([]string, 0, len(aliasesByGroupID))
+	for groupID := range aliasesByGroupID {
+		sort.Strings(aliasesByGroupID[groupID])
+		groupIDs = append(groupIDs, groupID)
+	}
+	sort.Strings(groupIDs)
+
+	type groupMembers struct {
+		groupID string
+		userIDs []string
+	}
+	results := make([]groupMembers, len(groupIDs))
+	group, groupCtx := errgroup.WithContext(ctx)
+	for index, groupID := range groupIDs {
+		group.Go(func() error {
+			userIDs, err := s.client.ListEntraGroupUserIDs(groupCtx, groupID)
+			if err != nil {
+				return err
+			}
+			results[index] = groupMembers{groupID: groupID, userIDs: userIDs}
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
+
+	aliasesByUserID := make(map[string]map[string]struct{})
+	for _, result := range results {
+		for _, userID := range result.userIDs {
+			aliases := aliasesByUserID[userID]
+			if aliases == nil {
+				aliases = make(map[string]struct{})
+				aliasesByUserID[userID] = aliases
+			}
+			for _, alias := range aliasesByGroupID[result.groupID] {
+				aliases[alias] = struct{}{}
+			}
+		}
+	}
+	groupsByUserID := make(map[string][]string, len(aliasesByUserID))
+	for userID, aliasSet := range aliasesByUserID {
+		aliases := make([]string, 0, len(aliasSet))
+		for alias := range aliasSet {
+			aliases = append(aliases, alias)
+		}
+		sort.Strings(aliases)
+		groupsByUserID[userID] = aliases
+	}
+	return groupsByUserID, nil
 }
 
 type intuneSource struct {

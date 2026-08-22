@@ -34,4 +34,4 @@ WORKDIR /
 COPY --from=builder /workspace/snipe-sync /snipe-sync
 USER 65532:65532
 ENTRYPOINT ["/snipe-sync"]
-CMD ["run", "--once"]
+CMD ["run"]

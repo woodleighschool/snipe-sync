@@ -16,6 +16,9 @@ const supportedVersion = 1
 var identifierPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
 
 func (c *Config) applyDefaults() {
+	if !c.Reconcile.PollInterval.set {
+		c.Reconcile.PollInterval.Duration = time.Minute
+	}
 	if strings.TrimSpace(c.Users.IncludeWhen) == "" {
 		c.Users.IncludeWhen = "true"
 	}
@@ -32,6 +35,9 @@ func (c *Config) applyDefaults() {
 func (c *Config) validateAndCompile() error {
 	if c.Version != supportedVersion {
 		return fmt.Errorf("config version must be %d, found %d", supportedVersion, c.Version)
+	}
+	if c.Reconcile.PollInterval.Duration <= 0 {
+		return fmt.Errorf("reconcile.poll_interval must be greater than zero")
 	}
 	if err := c.validateConnections(); err != nil {
 		return err

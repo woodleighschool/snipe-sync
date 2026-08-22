@@ -1,6 +1,6 @@
 # snipe-sync
 
-Reconciles Microsoft Entra users and managed devices from Intune and Jamf Pro into Snipe-IT from one YAML policy.
+Reconciles Microsoft Entra users and managed devices from Intune and Jamf Pro into Snipe-IT from one YAML policy. It can run once from the command line or continuously as a service.
 
 The command builds one deterministic plan from authoritative provider state and only writes that exact plan when run in apply mode.
 
@@ -17,21 +17,22 @@ snipe-sync validate
 snipe-sync plan
 snipe-sync plan --output json
 snipe-sync run --once
+snipe-sync run
 ```
 
-Multiple `--config` flags apply overlays in order. `plan` is always read-only. Applying requires the explicit `--once` flag; there is no continuous mode.
+Multiple `--config` flags apply overlays in order. `plan` is always read-only. `run` applies immediately and continues at `reconcile.poll_interval`; `run --once` applies one cycle and exits.
 
-The published container runs one reconciliation by default:
+The published container runs the continuous service by default:
 
 ```bash
 docker run --rm \
   --env-file .env \
   --volume "$PWD/config.yaml:/config.yaml:ro" \
   ghcr.io/woodleighschool/snipe-sync:rolling \
-  run --config /config.yaml --once
+  run --config /config.yaml
 ```
 
-`snipe-sync` has no interval loop or local reconciliation state. Use a scheduler for cadence. Each apply run lists changes and errors; unchanged and skipped devices are reported only in the summary, avoiding repetitive per-device log noise.
+Apply mode writes structured JSON logs to stderr. Changes, failures, and cycle summaries use the default `info` level; unchanged and skipped items are available with `--log-level debug`.
 
 ## ⚙️ Configuration
 
@@ -43,6 +44,7 @@ Configuration is strict and versioned. Unknown fields, missing references, ambig
 | `identity`    | Internal domains and Entra group aliases                 |
 | `devices`     | Intune and Jamf sources, precedence, and managed-by text |
 | `target`      | Snipe-IT connection and checkout timezone                |
+| `reconcile`   | Interval between completed reconciliation cycles         |
 | `users`       | Selection, location, and disabled-user policy            |
 | `assets`      | Eligibility, status, assignment, and absence policy      |
 
@@ -52,7 +54,9 @@ User selection, first-match location rules, and shared-device preservation use t
 
 ## 🔄 Reconciliation
 
-Each invocation reads complete Entra, Intune, Jamf, and Snipe-IT snapshots before calculating user and asset decisions. If any configured top-level source fails or returns an incomplete page set, the command exits before writes. An individual optional Entra group lookup may warn and preserve the current Snipe location while safe user fields continue to reconcile.
+The process bootstraps a complete Entra user snapshot with a delta query, then advances an in-memory snapshot and cursor on later cycles. Configured group aliases use transitive group-member snapshots, avoiding a membership request for every user. User state and its cursor advance together only after the full delta round and all group snapshots complete; an expired cursor triggers a fresh bootstrap. Restarting the process also performs a fresh bootstrap.
+
+Intune, Jamf, and Snipe-IT remain complete bulk snapshots each cycle. Cycles run serially, and the poll interval starts after a cycle finishes. If any configured source fails or returns an incomplete page set, that cycle performs no writes.
 
 Users are created first, followed by updates and disables. IDs returned for new users are then available to asset assignment. All asset patches complete before check-ins begin, and all check-ins complete before checkouts begin. An item failure stops later actions for that asset while independent items continue.
 
@@ -74,7 +78,7 @@ mise run vulncheck
 
 Tests use local servers and synthetic identities; provider credentials are not required.
 
-Review the plan before using `run --once` against a live Snipe-IT instance.
+Review the plan before using `run` against a live Snipe-IT instance.
 
 ## 📄 License
 

@@ -1,7 +1,11 @@
 // Package config loads and validates the versioned YAML policy.
 package config
 
-import "github.com/woodleighschool/snipe-sync/internal/expression"
+import (
+	"time"
+
+	"github.com/woodleighschool/snipe-sync/internal/expression"
+)
 
 // Config is the complete versioned configuration.
 type Config struct {
@@ -10,9 +14,15 @@ type Config struct {
 	Identity    Identity              `yaml:"identity"`
 	Devices     []DeviceSource        `yaml:"devices"     jsonschema:"minItems=1"`
 	Target      Target                `yaml:"target"`
+	Reconcile   Reconcile             `yaml:"reconcile,omitempty"`
 	Users       UserPolicy            `yaml:"users"`
 	Assets      AssetPolicy           `yaml:"assets"`
 	Programs    Programs              `yaml:"-"`
+}
+
+// Reconcile controls the interval between completed reconciliation cycles.
+type Reconcile struct {
+	PollInterval Duration `yaml:"poll_interval,omitempty"`
 }
 
 // Connection contains credentials for one remote API.
@@ -110,4 +120,11 @@ type Programs struct {
 	UserInclude expression.Program
 	Locations   []expression.Program
 	SharedAsset expression.Program
+}
+
+// Duration is a YAML duration parsed with time.ParseDuration.
+type Duration struct {
+	time.Duration
+
+	set bool
 }

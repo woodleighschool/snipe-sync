@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 const validConfig = `
@@ -87,6 +88,32 @@ assets:
 	}
 	if cfg.Assets.ManagedByField != "Managed By" {
 		t.Fatal("overlay discarded sibling mapping values")
+	}
+}
+
+func TestLoadAppliesAndValidatesPollInterval(t *testing.T) {
+	path := writeConfig(t, "config.yaml", validConfig)
+	cfg, err := load([]string{path}, func(string) (string, bool) { return "", false })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := cfg.Reconcile.PollInterval.Duration, time.Minute; got != want {
+		t.Errorf("poll interval = %s, want %s", got, want)
+	}
+	custom := strings.Replace(validConfig, "version: 1", "version: 1\nreconcile:\n  poll_interval: 30s", 1)
+	path = writeConfig(t, "custom.yaml", custom)
+	cfg, err = load([]string{path}, func(string) (string, bool) { return "", false })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := cfg.Reconcile.PollInterval.Duration, 30*time.Second; got != want {
+		t.Errorf("custom poll interval = %s, want %s", got, want)
+	}
+
+	path = writeConfig(t, "invalid.yaml", "reconcile:\n  poll_interval: 0s\n"+validConfig)
+	_, err = load([]string{path}, func(string) (string, bool) { return "", false })
+	if err == nil || !strings.Contains(err.Error(), "reconcile.poll_interval must be greater than zero") {
+		t.Fatalf("Load error = %v, want poll interval error", err)
 	}
 }
 

@@ -2,76 +2,159 @@ package microsoft
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
-	"reflect"
+	"net/url"
+	"slices"
 	"strings"
 	"testing"
 )
 
-func TestListEntraUsersFiltersCandidatesAndPreservesGroupFailure(t *testing.T) {
-	transport := roundTripFunc(func(request *http.Request) (*http.Response, error) {
-		if request.URL.Path == "/v1.0/users" {
-			if got, want := request.URL.Query().Get("$top"), "999"; got != want {
-				t.Errorf("$top = %q, want %q", got, want)
+func TestListEntraUserDeltaReadsCompleteRound(t *testing.T) {
+	requests := 0
+	client := newTestClient(t, roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		requests++
+		switch requests {
+		case 1:
+			if got, want := request.URL.Path, "/v1.0/users/delta()"; got != want {
+				t.Fatalf("path = %q, want %q", got, want)
 			}
-			return jsonResponse(http.StatusOK, map[string]any{"value": []map[string]any{
-				{"id": "user-1", "givenName": "Casey", "surname": "Unit", "userPrincipalName": " CASEY@EXAMPLE.INVALID ", "mailNickname": "Casey", "department": "Staff", "createdDateTime": "2026-01-02T03:04:05Z"},
-				{"id": "user-2", "givenName": "Taylor", "userPrincipalName": "taylor@example.invalid", "mailNickname": "taylor"},
-				{"id": "guest", "givenName": "Guest", "userPrincipalName": "guest_example.com#EXT#@example.invalid"},
-				{"id": "external", "givenName": "External", "userPrincipalName": "external@other.invalid"},
-			}}), nil
+			selectFields := strings.Split(request.URL.Query().Get("$select"), ",")
+			for _, field := range []string{"id", "givenName", "surname", "userPrincipalName", "mailNickname", "department", "createdDateTime"} {
+				if !slices.Contains(selectFields, field) {
+					t.Errorf("$select = %v, missing %q", selectFields, field)
+				}
+			}
+			return jsonResponse(http.StatusOK, map[string]any{
+				"value": []map[string]any{
+					{"id": "user-1", "givenName": " Casey ", "surname": " Unit ", "userPrincipalName": " CASEY@EXAMPLE.INVALID ", "mailNickname": " Casey ", "department": " Staff ", "createdDateTime": "2026-01-02T03:04:05Z"},
+					{"id": "user-2", "@removed": map[string]string{"reason": "deleted"}},
+				},
+				"@odata.nextLink": "https://graph.test/v1.0/users/delta?$skiptoken=next",
+			}), nil
+		case 2:
+			if got, want := request.URL.Query().Get("$skiptoken"), "next"; got != want {
+				t.Fatalf("$skiptoken = %q, want %q", got, want)
+			}
+			return jsonResponse(http.StatusOK, map[string]any{
+				"value":            []map[string]any{{"id": "user-3", "givenName": "Taylor", "userPrincipalName": "taylor@example.invalid"}},
+				"@odata.deltaLink": "https://graph.test/v1.0/users/delta?$deltatoken=current",
+			}), nil
+		default:
+			return nil, fmt.Errorf("unexpected request %s", request.URL)
 		}
-		if !strings.HasSuffix(request.URL.Path, "/checkMemberGroups") {
-			return nil, fmt.Errorf("unexpected path %s", request.URL.Path)
-		}
-		if strings.Contains(request.URL.Path, "user-2") {
-			return jsonResponse(http.StatusServiceUnavailable, map[string]any{"error": map[string]string{"code": "Unavailable", "message": "try later"}}), nil
-		}
-		var payload struct {
-			GroupIDs []string `json:"groupIds"`
-		}
-		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
-			t.Fatal(err)
-		}
-		if got, want := payload.GroupIDs, []string{"group-1"}; !reflect.DeepEqual(got, want) {
-			t.Errorf("group IDs = %v, want %v", got, want)
-		}
-		return jsonResponse(http.StatusOK, map[string]any{"value": []string{"group-1"}}), nil
-	})
-	client := newTestClient(t, transport)
+	}))
 
-	users, warnings, err := client.ListEntraUsers(context.Background(), []string{"example.invalid"}, map[string][]string{"staff": {"group-1"}}, 2)
+	delta, err := client.ListEntraUserDelta(context.Background(), "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(users), 2; got != want {
-		t.Fatalf("users = %d, want %d", got, want)
+	if got, want := len(delta.Changes), 3; got != want {
+		t.Fatalf("changes = %d, want %d", got, want)
 	}
-	if got, want := users[0].UserPrincipalName, "casey@example.invalid"; got != want {
-		t.Errorf("first user = %q, want %q", got, want)
+	if got, want := delta.Changes[0].User.UserPrincipalName, "casey@example.invalid"; got != want {
+		t.Errorf("user principal name = %q, want %q", got, want)
 	}
-	if got, want := users[0].Groups, []string{"staff"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("groups = %v, want %v", got, want)
+	if got, want := delta.Changes[0].User.GivenName, "Casey"; got != want {
+		t.Errorf("given name = %q, want %q", got, want)
 	}
-	if !users[0].GroupsComplete {
-		t.Error("successful group snapshot is incomplete")
+	if !delta.Changes[1].Removed {
+		t.Error("removed user was not marked removed")
 	}
-	if users[1].GroupsComplete {
-		t.Error("failed group snapshot is complete")
-	}
-	if got, want := len(warnings), 1; got != want || warnings[0].UserPrincipalName != "taylor@example.invalid" {
-		t.Fatalf("warnings = %#v, want one Taylor warning", warnings)
+	if got, want := delta.DeltaLink, "https://graph.test/v1.0/users/delta?$deltatoken=current"; got != want {
+		t.Errorf("delta link = %q, want %q", got, want)
 	}
 }
 
-func TestListEntraUsersRejectsMissingCollectionValue(t *testing.T) {
-	client := newTestClient(t, roundTripFunc(func(*http.Request) (*http.Response, error) {
-		return jsonResponse(http.StatusOK, map[string]any{"@odata.context": "fixture"}), nil
+func TestListEntraUserDeltaUsesStoredLink(t *testing.T) {
+	wantLink := "https://graph.test/v1.0/users/delta?$deltatoken=stored"
+	client := newTestClient(t, roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if got := request.URL.String(); got != wantLink {
+			t.Fatalf("URL = %q, want %q", got, wantLink)
+		}
+		return jsonResponse(http.StatusOK, map[string]any{
+			"value":            []map[string]any{},
+			"@odata.deltaLink": "https://graph.test/v1.0/users/delta?$deltatoken=next",
+		}), nil
 	}))
-	_, _, err := client.ListEntraUsers(context.Background(), []string{"example.invalid"}, nil, 1)
-	if err == nil || !strings.Contains(err.Error(), "response is missing value") {
-		t.Fatalf("ListEntraUsers error = %v, want missing-value error", err)
+
+	delta, err := client.ListEntraUserDelta(context.Background(), wantLink)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := delta.DeltaLink, "https://graph.test/v1.0/users/delta?$deltatoken=next"; got != want {
+		t.Errorf("delta link = %q, want %q", got, want)
+	}
+}
+
+func TestListEntraUserDeltaRejectsIncompleteRound(t *testing.T) {
+	tests := map[string]map[string]any{
+		"missing value":      {"@odata.deltaLink": "https://graph.test/delta"},
+		"missing delta link": {"value": []map[string]any{}},
+	}
+	for name, body := range tests {
+		t.Run(name, func(t *testing.T) {
+			client := newTestClient(t, roundTripFunc(func(*http.Request) (*http.Response, error) {
+				return jsonResponse(http.StatusOK, body), nil
+			}))
+			_, err := client.ListEntraUserDelta(context.Background(), "")
+			if err == nil {
+				t.Fatal("ListEntraUserDelta succeeded")
+			}
+		})
+	}
+}
+
+func TestListEntraUserDeltaClassifiesExpiredLink(t *testing.T) {
+	client := newTestClient(t, roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return jsonResponse(http.StatusGone, map[string]any{
+			"error": map[string]string{"code": "syncStateNotFound", "message": "expired"},
+		}), nil
+	}))
+
+	_, err := client.ListEntraUserDelta(context.Background(), "https://graph.test/v1.0/users/delta?$deltatoken=expired")
+	if !errors.Is(err, ErrDeltaExpired) {
+		t.Fatalf("ListEntraUserDelta error = %v, want ErrDeltaExpired", err)
+	}
+}
+
+func TestListEntraGroupUserIDsReadsTransitivePages(t *testing.T) {
+	requests := 0
+	client := newTestClient(t, roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		requests++
+		if got, want := request.Header.Get("ConsistencyLevel"), "eventual"; got != want {
+			t.Errorf("ConsistencyLevel = %q, want %q", got, want)
+		}
+		switch requests {
+		case 1:
+			if got, want := request.URL.Path, "/v1.0/groups/group-1/transitiveMembers/graph.user"; got != want {
+				t.Fatalf("path = %q, want %q", got, want)
+			}
+			query, _ := url.QueryUnescape(request.URL.RawQuery)
+			for _, value := range []string{"$count=true", "$select=id", "$top=999"} {
+				if !strings.Contains(query, value) {
+					t.Errorf("query = %q, missing %q", query, value)
+				}
+			}
+			return jsonResponse(http.StatusOK, map[string]any{
+				"value":           []map[string]any{{"id": "user-2"}, {"id": "user-1"}},
+				"@odata.nextLink": "https://graph.test/v1.0/groups/group-1/transitiveMembers/graph.user?$skiptoken=next",
+			}), nil
+		case 2:
+			return jsonResponse(http.StatusOK, map[string]any{
+				"value": []map[string]any{{"id": "user-2"}, {"id": "user-3"}},
+			}), nil
+		default:
+			return nil, fmt.Errorf("unexpected request %s", request.URL)
+		}
+	}))
+
+	userIDs, err := client.ListEntraGroupUserIDs(context.Background(), "group-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"user-1", "user-2", "user-3"}; !slices.Equal(userIDs, want) {
+		t.Errorf("user IDs = %v, want %v", userIDs, want)
 	}
 }

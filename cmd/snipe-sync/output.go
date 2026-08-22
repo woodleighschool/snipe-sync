@@ -7,7 +7,6 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/woodleighschool/snipe-sync/internal/app"
 	"github.com/woodleighschool/snipe-sync/internal/planner"
 )
 
@@ -20,10 +19,10 @@ func writePlan(writer io.Writer, output string, plan planner.Plan) error {
 		}
 		return nil
 	}
-	return writeHumanPlan(writer, plan, true)
+	return writeHumanPlan(writer, plan)
 }
 
-func writeHumanPlan(writer io.Writer, plan planner.Plan, includeRoutine bool) error {
+func writeHumanPlan(writer io.Writer, plan planner.Plan) error {
 	for _, warning := range plan.Warnings {
 		if _, err := fmt.Fprintf(writer, "Warning: %s\n", warning); err != nil {
 			return fmt.Errorf("write warning: %w", err)
@@ -45,9 +44,6 @@ func writeHumanPlan(writer io.Writer, plan planner.Plan, includeRoutine bool) er
 		return fmt.Errorf("write device header: %w", err)
 	}
 	for _, asset := range plan.Assets {
-		if !includeRoutine && asset.Result != planner.AssetChange {
-			continue
-		}
 		if _, err := fmt.Fprintf(
 			table,
 			"%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
@@ -75,30 +71,6 @@ func writeHumanPlan(writer io.Writer, plan planner.Plan, includeRoutine bool) er
 		assetCounts[planner.AssetSkipped],
 	)
 	return err
-}
-
-func writeRunResult(writer io.Writer, result app.Result) error {
-	if err := writeHumanPlan(writer, result.Plan, false); err != nil {
-		return err
-	}
-	if result.Apply == nil {
-		return nil
-	}
-	if _, err := fmt.Fprintf(
-		writer,
-		"Applied users: %d; assets: %d; errors: %d\n",
-		result.Apply.UsersApplied,
-		result.Apply.AssetsApplied,
-		len(result.Apply.Failures),
-	); err != nil {
-		return fmt.Errorf("write apply summary: %w", err)
-	}
-	for _, failure := range result.Apply.Failures {
-		if _, err := fmt.Fprintf(writer, "Error: %s %s: %s\n", failure.Kind, failure.Identifier, failure.Error); err != nil {
-			return fmt.Errorf("write apply failure: %w", err)
-		}
-	}
-	return nil
 }
 
 func formatChange(current, desired string) string {

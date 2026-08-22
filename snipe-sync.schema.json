@@ -99,6 +99,9 @@
         "target": {
           "$ref": "#/$defs/Target"
         },
+        "reconcile": {
+          "$ref": "#/$defs/Reconcile"
+        },
         "users": {
           "$ref": "#/$defs/UserPolicy"
         },
@@ -248,6 +251,20 @@
             "$ref": "#/$defs/LocationCase"
           },
           "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Reconcile": {
+      "properties": {
+        "poll_interval": {
+          "type": "string",
+          "examples": [
+            "1m",
+            "15m",
+            "1h"
+          ]
         }
       },
       "additionalProperties": false,

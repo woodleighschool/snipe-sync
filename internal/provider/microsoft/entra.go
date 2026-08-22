@@ -2,53 +2,49 @@ package microsoft
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"sort"
 	"strings"
 
+	kiota "github.com/microsoft/kiota-abstractions-go"
+	graphgroups "github.com/microsoftgraph/msgraph-sdk-go/groups"
 	graphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
 
 	"github.com/woodleighschool/snipe-sync/internal/domain"
 )
 
+// ErrDeltaExpired indicates that Graph can no longer continue from a stored delta link.
+var ErrDeltaExpired = errors.New("entra user delta link expired")
+
 const graphPageSize int32 = 999
 
-const checkMemberGroupsLimit = 20
-
-// EnrichmentWarning reports a user whose optional group snapshot was incomplete.
-type EnrichmentWarning struct {
-	UserPrincipalName string
-	Err               error
+// EntraUserChange is one created, updated, or removed directory user.
+type EntraUserChange struct {
+	User    domain.User
+	Removed bool
 }
 
-// Error returns a stable user-scoped warning.
-func (w EnrichmentWarning) Error() string {
-	return fmt.Sprintf("Entra group enrichment for %s: %v", w.UserPrincipalName, w.Err)
+// EntraUserDelta contains a complete delta round and the link for the next round.
+type EntraUserDelta struct {
+	Changes   []EntraUserChange
+	DeltaLink string
 }
 
-type enrichedUser struct {
-	index  int
-	groups []string
-	err    error
-}
-
-// ListEntraUsers returns a complete directory snapshot for configured internal domains.
-// Per-user group failures are returned as warnings and leave GroupsComplete false.
-func (c *Client) ListEntraUsers(
-	ctx context.Context,
-	domains []string,
-	groupAliases map[string][]string,
-	concurrency int,
-) ([]domain.User, []EnrichmentWarning, error) {
+// ListEntraUserDelta reads a complete initial or incremental user delta round.
+func (c *Client) ListEntraUserDelta(ctx context.Context, deltaLink string) (EntraUserDelta, error) {
 	if c == nil || c.graph == nil {
-		return nil, nil, fmt.Errorf("graph client is required")
+		return EntraUserDelta{}, fmt.Errorf("graph client is required")
 	}
-	if concurrency <= 0 {
-		return nil, nil, fmt.Errorf("concurrency must be greater than zero")
-	}
-	page, err := c.graph.Users().Get(ctx, &graphusers.UsersRequestBuilderGetRequestConfiguration{
-		QueryParameters: &graphusers.UsersRequestBuilderGetQueryParameters{
-			Select: []string{
+
+	var (
+		page graphusers.DeltaGetResponseable
+		err  error
+	)
+	if deltaLink == "" {
+		page, err = c.graph.Users().Delta().GetAsDeltaGetResponse(ctx, &graphusers.DeltaRequestBuilderGetRequestConfiguration{
+			QueryParameters: &graphusers.DeltaRequestBuilderGetQueryParameters{Select: []string{
 				"id",
 				"givenName",
 				"surname",
@@ -56,176 +52,157 @@ func (c *Client) ListEntraUsers(
 				"mailNickname",
 				"department",
 				"createdDateTime",
-			},
-			Top: new(graphPageSize),
-		},
-	})
+			}},
+		})
+	} else {
+		page, err = graphusers.NewDeltaRequestBuilder(deltaLink, c.graph.GetAdapter()).GetAsDeltaGetResponse(ctx, nil)
+	}
 	if err != nil {
-		return nil, nil, fmt.Errorf("list Entra users: %w", err)
+		return EntraUserDelta{}, classifyDeltaError(err)
 	}
 	if page == nil {
-		return nil, nil, fmt.Errorf("list Entra users: Graph returned no response")
+		return EntraUserDelta{}, fmt.Errorf("list Entra user delta: Graph returned no response")
 	}
 
-	domainSet := make(map[string]struct{}, len(domains))
-	for _, value := range domains {
-		domainSet[strings.ToLower(strings.TrimSpace(value))] = struct{}{}
-	}
-	users := make([]domain.User, 0)
+	result := EntraUserDelta{}
 	seenLinks := make(map[string]struct{})
 	for {
 		pageUsers := page.GetValue()
 		if pageUsers == nil {
-			return nil, nil, fmt.Errorf("list Entra users: Graph response is missing value")
+			return EntraUserDelta{}, fmt.Errorf("list Entra user delta: Graph response is missing value")
 		}
 		for _, user := range pageUsers {
-			email := normalizeEmail(dereference(user.GetUserPrincipalName()))
-			givenName := strings.TrimSpace(dereference(user.GetGivenName()))
-			if email == "" || strings.Contains(email, "#ext#") || givenName == "" || !emailInDomains(email, domainSet) {
-				continue
+			if user == nil {
+				return EntraUserDelta{}, fmt.Errorf("list Entra user delta: Graph returned a null user")
 			}
-			converted := domain.User{
+			id := strings.TrimSpace(dereference(user.GetId()))
+			if id == "" {
+				return EntraUserDelta{}, fmt.Errorf("list Entra user delta: Graph returned a user without an ID")
+			}
+			change := EntraUserChange{User: domain.User{
 				Present:           true,
-				ID:                dereference(user.GetId()),
-				GivenName:         givenName,
+				ID:                id,
+				GivenName:         strings.TrimSpace(dereference(user.GetGivenName())),
 				Surname:           strings.TrimSpace(dereference(user.GetSurname())),
 				MailNickname:      strings.ToLower(strings.TrimSpace(dereference(user.GetMailNickname()))),
-				UserPrincipalName: email,
+				UserPrincipalName: normalizeEmail(dereference(user.GetUserPrincipalName())),
 				Department:        strings.TrimSpace(dereference(user.GetDepartment())),
-			}
+			}}
 			if createdAt := user.GetCreatedDateTime(); createdAt != nil {
-				converted.CreatedAt = createdAt.UTC()
+				change.User.CreatedAt = createdAt.UTC()
 			}
-			users = append(users, converted)
+			_, change.Removed = user.GetAdditionalData()["@removed"]
+			result.Changes = append(result.Changes, change)
 		}
+
 		nextLink := page.GetOdataNextLink()
 		if nextLink == nil || *nextLink == "" {
 			break
 		}
 		if _, duplicate := seenLinks[*nextLink]; duplicate {
-			return nil, nil, fmt.Errorf("page Entra users: Graph repeated next link")
+			return EntraUserDelta{}, fmt.Errorf("page Entra user delta: Graph repeated next link")
 		}
 		seenLinks[*nextLink] = struct{}{}
-		page, err = graphusers.NewUsersRequestBuilder(*nextLink, c.graph.GetAdapter()).Get(ctx, nil)
+		page, err = graphusers.NewDeltaRequestBuilder(*nextLink, c.graph.GetAdapter()).GetAsDeltaGetResponse(ctx, nil)
 		if err != nil {
-			return nil, nil, fmt.Errorf("page Entra users: %w", err)
+			return EntraUserDelta{}, classifyDeltaError(err)
 		}
 		if page == nil {
-			return nil, nil, fmt.Errorf("page Entra users: Graph returned no response")
+			return EntraUserDelta{}, fmt.Errorf("page Entra user delta: Graph returned no response")
 		}
 	}
 
-	groupIDs, aliasesByID := prepareGroupAliases(groupAliases)
-	if len(groupIDs) == 0 {
-		for index := range users {
-			users[index].GroupsComplete = true
-		}
-		sortUsers(users)
-		return users, nil, nil
+	if link := page.GetOdataDeltaLink(); link != nil {
+		result.DeltaLink = strings.TrimSpace(*link)
 	}
-	jobs := make(chan int, len(users))
-	results := make(chan enrichedUser, len(users))
-	for index := range users {
-		jobs <- index
+	if result.DeltaLink == "" {
+		return EntraUserDelta{}, fmt.Errorf("list Entra user delta: Graph response is missing delta link")
 	}
-	close(jobs)
-	for range min(concurrency, len(users)) {
-		go func() {
-			for index := range jobs {
-				groups, groupErr := c.checkGroupAliases(ctx, users[index].ID, groupIDs, aliasesByID)
-				results <- enrichedUser{index: index, groups: groups, err: groupErr}
-			}
-		}()
-	}
-	warnings := make([]EnrichmentWarning, 0)
-	for range users {
-		result := <-results
-		if result.err != nil {
-			warnings = append(warnings, EnrichmentWarning{
-				UserPrincipalName: users[result.index].UserPrincipalName,
-				Err:               result.err,
-			})
-			continue
-		}
-		users[result.index].Groups = result.groups
-		users[result.index].GroupsComplete = true
-	}
-	sortUsers(users)
-	sort.Slice(warnings, func(left, right int) bool {
-		return warnings[left].UserPrincipalName < warnings[right].UserPrincipalName
-	})
-	return users, warnings, nil
+	return result, nil
 }
 
-func (c *Client) checkGroupAliases(
-	ctx context.Context,
-	userID string,
-	groupIDs []string,
-	aliasesByID map[string][]string,
-) ([]string, error) {
-	if userID == "" {
-		return nil, fmt.Errorf("entra user has no ID")
+// ListEntraGroupUserIDs returns the IDs of every transitive user member of a group.
+func (c *Client) ListEntraGroupUserIDs(ctx context.Context, groupID string) ([]string, error) {
+	if c == nil || c.graph == nil {
+		return nil, fmt.Errorf("graph client is required")
 	}
-	aliases := make(map[string]struct{})
-	for start := 0; start < len(groupIDs); start += checkMemberGroupsLimit {
-		end := min(start+checkMemberGroupsLimit, len(groupIDs))
-		body := graphusers.NewItemCheckMemberGroupsPostRequestBody()
-		body.SetGroupIds(groupIDs[start:end])
-		response, err := c.graph.Users().ByUserId(userID).CheckMemberGroups().PostAsCheckMemberGroupsPostResponse(ctx, body, nil)
-		if err != nil {
-			return nil, fmt.Errorf("check Entra groups: %w", err)
+	groupID = strings.TrimSpace(groupID)
+	if groupID == "" {
+		return nil, fmt.Errorf("group ID is required")
+	}
+
+	headers := kiota.NewRequestHeaders()
+	headers.TryAdd("ConsistencyLevel", "eventual")
+	page, err := c.graph.Groups().ByGroupId(groupID).TransitiveMembers().GraphUser().Get(ctx,
+		&graphgroups.ItemTransitiveMembersGraphUserRequestBuilderGetRequestConfiguration{
+			Headers: headers,
+			QueryParameters: &graphgroups.ItemTransitiveMembersGraphUserRequestBuilderGetQueryParameters{
+				Count:  new(true),
+				Select: []string{"id"},
+				Top:    new(graphPageSize),
+			},
+		})
+	if err != nil {
+		return nil, fmt.Errorf("list transitive users for Entra group %s: %w", groupID, err)
+	}
+	if page == nil {
+		return nil, fmt.Errorf("list transitive users for Entra group %s: Graph returned no response", groupID)
+	}
+
+	memberIDs := make(map[string]struct{})
+	seenLinks := make(map[string]struct{})
+	for {
+		members := page.GetValue()
+		if members == nil {
+			return nil, fmt.Errorf("list transitive users for Entra group %s: Graph response is missing value", groupID)
 		}
-		if response == nil {
-			return nil, fmt.Errorf("check Entra groups: Graph returned no response")
-		}
-		for _, groupID := range response.GetValue() {
-			for _, alias := range aliasesByID[strings.ToLower(groupID)] {
-				aliases[alias] = struct{}{}
+		for _, member := range members {
+			if member == nil {
+				return nil, fmt.Errorf("list transitive users for Entra group %s: Graph returned a null user", groupID)
 			}
+			id := strings.TrimSpace(dereference(member.GetId()))
+			if id == "" {
+				return nil, fmt.Errorf("list transitive users for Entra group %s: Graph returned a user without an ID", groupID)
+			}
+			memberIDs[id] = struct{}{}
+		}
+
+		nextLink := page.GetOdataNextLink()
+		if nextLink == nil || *nextLink == "" {
+			break
+		}
+		if _, duplicate := seenLinks[*nextLink]; duplicate {
+			return nil, fmt.Errorf("page transitive users for Entra group %s: Graph repeated next link", groupID)
+		}
+		seenLinks[*nextLink] = struct{}{}
+		page, err = graphgroups.NewItemTransitiveMembersGraphUserRequestBuilder(*nextLink, c.graph.GetAdapter()).Get(ctx,
+			&graphgroups.ItemTransitiveMembersGraphUserRequestBuilderGetRequestConfiguration{Headers: headers})
+		if err != nil {
+			return nil, fmt.Errorf("page transitive users for Entra group %s: %w", groupID, err)
+		}
+		if page == nil {
+			return nil, fmt.Errorf("page transitive users for Entra group %s: Graph returned no response", groupID)
 		}
 	}
-	result := make([]string, 0, len(aliases))
-	for alias := range aliases {
-		result = append(result, alias)
+
+	result := make([]string, 0, len(memberIDs))
+	for id := range memberIDs {
+		result = append(result, id)
 	}
 	sort.Strings(result)
 	return result, nil
 }
 
-func prepareGroupAliases(groupAliases map[string][]string) ([]string, map[string][]string) {
-	aliasesByID := make(map[string][]string)
-	for alias, groupIDs := range groupAliases {
-		for _, groupID := range groupIDs {
-			key := strings.ToLower(strings.TrimSpace(groupID))
-			aliasesByID[key] = append(aliasesByID[key], alias)
-		}
+func classifyDeltaError(err error) error {
+	var apiError interface{ GetStatusCode() int }
+	if errors.As(err, &apiError) && apiError.GetStatusCode() == http.StatusGone {
+		return fmt.Errorf("%w: %w", ErrDeltaExpired, err)
 	}
-	groupIDs := make([]string, 0, len(aliasesByID))
-	for groupID := range aliasesByID {
-		sort.Strings(aliasesByID[groupID])
-		groupIDs = append(groupIDs, groupID)
-	}
-	sort.Strings(groupIDs)
-	return groupIDs, aliasesByID
+	return fmt.Errorf("list Entra user delta: %w", err)
 }
 
 func normalizeEmail(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
-}
-
-func emailInDomains(email string, domains map[string]struct{}) bool {
-	separator := strings.LastIndexByte(email, '@')
-	if separator < 0 {
-		return false
-	}
-	_, ok := domains[email[separator+1:]]
-	return ok
-}
-
-func sortUsers(users []domain.User) {
-	sort.Slice(users, func(left, right int) bool {
-		return users[left].UserPrincipalName < users[right].UserPrincipalName
-	})
 }
 
 func dereference(value *string) string {

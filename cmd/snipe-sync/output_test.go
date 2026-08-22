@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/woodleighschool/snipe-sync/internal/app"
 	"github.com/woodleighschool/snipe-sync/internal/domain"
 	"github.com/woodleighschool/snipe-sync/internal/planner"
 )
@@ -23,29 +22,6 @@ func TestWriteJSONPlanProducesOneCompleteObject(t *testing.T) {
 	}
 	if len(decoded.Users) != 1 || len(decoded.Assets) != 2 {
 		t.Errorf("decoded plan = %#v", decoded)
-	}
-}
-
-func TestWriteRunResultSummarizesRoutineDevicesWithoutListingThem(t *testing.T) {
-	var output bytes.Buffer
-	result := app.Result{Plan: outputFixture(), Apply: &app.ApplyResult{AssetsApplied: 1}}
-	if err := writeRunResult(&output, result); err != nil {
-		t.Fatal(err)
-	}
-	text := output.String()
-	for _, unwanted := range []string{"SERIAL-2", "missing in Snipe"} {
-		if strings.Contains(text, unwanted) {
-			t.Errorf("run output contains routine detail %q:\n%s", unwanted, text)
-		}
-	}
-	for _, want := range []string{
-		"SERIAL-1",
-		"Device summary: 2 total, 1 change, 0 unchanged, 1 skipped",
-		"Applied users: 0; assets: 1; errors: 0",
-	} {
-		if !strings.Contains(text, want) {
-			t.Errorf("run output missing %q:\n%s", want, text)
-		}
 	}
 }
 

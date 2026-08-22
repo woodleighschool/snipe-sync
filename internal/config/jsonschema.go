@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"reflect"
 
 	"github.com/invopop/jsonschema"
 )
@@ -10,7 +11,20 @@ import (
 
 // JSONSchema returns the editor-facing structural schema generated from Config's YAML tags.
 func JSONSchema() *jsonschema.Schema {
-	reflector := &jsonschema.Reflector{FieldNameTag: "yaml"}
+	durationType := reflect.TypeFor[Duration]()
+	reflector := &jsonschema.Reflector{
+		FieldNameTag: "yaml",
+		Mapper: func(valueType reflect.Type) *jsonschema.Schema {
+			if valueType == durationType {
+				return &jsonschema.Schema{
+					Type:        "string",
+					Description: "A Go duration such as 1m, 15m, or 1h.",
+					Examples:    []any{"1m", "15m", "1h"},
+				}
+			}
+			return nil
+		},
+	}
 	schema := reflector.Reflect(&Config{})
 	schema.ID = jsonschema.ID("https://raw.githubusercontent.com/woodleighschool/snipe-sync/main/snipe-sync.schema.json")
 	schema.Title = "Configuration"

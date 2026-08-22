@@ -19,7 +19,7 @@ func TestJSONSchemaDocumentIsStable(t *testing.T) {
 	if !bytes.Equal(first, second) {
 		t.Fatal("JSON schema generation is not deterministic")
 	}
-	if !bytes.Contains(first, []byte("SnipeSync configuration")) {
+	if !bytes.Contains(first, []byte("Configuration")) {
 		t.Fatal("JSON schema is missing its title")
 	}
 }

@@ -22,14 +22,14 @@ snipe-sync run
 
 Multiple `--config` flags apply overlays in order. `plan` is always read-only. `run` applies immediately and continues at `reconcile.poll_interval`; `run --once` applies one cycle and exits.
 
-The published container runs the continuous service by default:
+The published container is the continuous service:
 
 ```bash
 docker run --rm \
   --env-file .env \
   --volume "$PWD/config.yaml:/config.yaml:ro" \
   ghcr.io/woodleighschool/snipe-sync:rolling \
-  run --config /config.yaml
+  --config /config.yaml
 ```
 
 Apply mode writes structured JSON logs to stderr. Changes, failures, and cycle summaries use the default `info` level; unchanged and skipped items are available with `--log-level debug`.

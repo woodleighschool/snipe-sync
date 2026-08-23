@@ -2,6 +2,7 @@
 package config
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/woodleighschool/snipe-sync/internal/expression"
@@ -10,19 +11,21 @@ import (
 // Config is the complete versioned configuration.
 type Config struct {
 	Version     int                   `yaml:"version"     jsonschema:"enum=1"`
+	LogLevel    string                `yaml:"log_level,omitempty" env:"LOG_LEVEL" jsonschema:"enum=debug,enum=info,enum=warn,enum=error"`
 	Connections map[string]Connection `yaml:"connections" jsonschema:"minProperties=1"`
 	Identity    Identity              `yaml:"identity"`
 	Devices     []DeviceSource        `yaml:"devices"     jsonschema:"minItems=1"`
 	Target      Target                `yaml:"target"`
-	Reconcile   Reconcile             `yaml:"reconcile,omitempty"`
+	Reconcile   Reconcile             `yaml:"reconcile,omitempty" envPrefix:"RECONCILE_"`
 	Users       UserPolicy            `yaml:"users"`
 	Assets      AssetPolicy           `yaml:"assets"`
 	Programs    Programs              `yaml:"-"`
+	ParsedLevel slog.Level            `yaml:"-" jsonschema:"-"`
 }
 
 // Reconcile controls the interval between completed reconciliation cycles.
 type Reconcile struct {
-	PollInterval Duration `yaml:"poll_interval,omitempty"`
+	PollInterval Duration `yaml:"poll_interval,omitempty" env:"POLL_INTERVAL"`
 }
 
 // Connection contains credentials for one remote API.
@@ -122,7 +125,7 @@ type Programs struct {
 	SharedAsset expression.Program
 }
 
-// Duration is a YAML duration parsed with time.ParseDuration.
+// Duration is a configuration duration parsed with time.ParseDuration.
 type Duration struct {
 	time.Duration
 

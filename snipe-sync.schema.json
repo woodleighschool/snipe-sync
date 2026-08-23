@@ -80,6 +80,15 @@
             1
           ]
         },
+        "log_level": {
+          "type": "string",
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        },
         "connections": {
           "additionalProperties": {
             "$ref": "#/$defs/Connection"

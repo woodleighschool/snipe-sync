@@ -28,8 +28,7 @@ The published container is the continuous service:
 docker run --rm \
   --env-file .env \
   --volume "$PWD/config.yaml:/config.yaml:ro" \
-  ghcr.io/woodleighschool/snipe-sync:rolling \
-  --config /config.yaml
+  ghcr.io/woodleighschool/snipe-sync:rolling
 ```
 
 Daemon mode writes structured JSON to stderr. Lifecycle and material reconciliation events use `info`, warnings and failures use `warn` or `error`, and successful cycle summaries plus routine no-op evaluations use `debug`.
@@ -37,6 +36,13 @@ Daemon mode writes structured JSON to stderr. Lifecycle and material reconciliat
 ## ⚙️ Configuration
 
 Configuration is strict and versioned. Unknown fields, missing references, ambiguous Snipe metadata, unset environment placeholders, and invalid CEL expressions fail before reconciliation. Mappings merge recursively; lists and scalar values replace earlier values. Environment placeholders must occupy the whole value, such as `${SNIPEIT_API_KEY}`.
+
+Runtime settings resolve from `SNIPE_SYNC_*` environment variables, then the corresponding YAML value, then the default. CLI flags select configuration files or command behaviour rather than mirroring runtime settings.
+
+| Environment variable                 | YAML fallback             | Default |
+| ------------------------------------ | ------------------------- | ------- |
+| `SNIPE_SYNC_LOG_LEVEL`               | `log_level`               | `info`  |
+| `SNIPE_SYNC_RECONCILE_POLL_INTERVAL` | `reconcile.poll_interval` | `1m`    |
 
 | Section       | Purpose                                                  |
 | ------------- | -------------------------------------------------------- |

@@ -76,7 +76,7 @@ assets:
   absent:
     enabled: false
 `)
-	cfg, err := load([]string{base, overlay}, func(string) (string, bool) { return "", false })
+	cfg, err := load([]string{base, overlay}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,9 +91,43 @@ assets:
 	}
 }
 
+func TestLoadResolvesEnvironmentOverYAMLOverDefaults(t *testing.T) {
+	local := strings.Replace(
+		validConfig,
+		"version: 1",
+		"version: 1\nlog_level: warn\nreconcile:\n  poll_interval: 30s",
+		1,
+	)
+	path := writeConfig(t, "local.yaml", local)
+	cfg, err := load([]string{path}, nil)
+	if err != nil {
+		t.Fatalf("load() local config error = %v", err)
+	}
+	if got, want := cfg.LogLevel, "warn"; got != want {
+		t.Errorf("local log level = %q, want %q", got, want)
+	}
+	if got, want := cfg.Reconcile.PollInterval.Duration, 30*time.Second; got != want {
+		t.Errorf("local poll interval = %v, want %v", got, want)
+	}
+
+	cfg, err = load([]string{path}, map[string]string{
+		"SNIPE_SYNC_LOG_LEVEL":               " DEBUG ",
+		"SNIPE_SYNC_RECONCILE_POLL_INTERVAL": "45s",
+	})
+	if err != nil {
+		t.Fatalf("load() environment override error = %v", err)
+	}
+	if got, want := cfg.LogLevel, "debug"; got != want {
+		t.Errorf("environment log level = %q, want %q", got, want)
+	}
+	if got, want := cfg.Reconcile.PollInterval.Duration, 45*time.Second; got != want {
+		t.Errorf("environment poll interval = %v, want %v", got, want)
+	}
+}
+
 func TestLoadAppliesAndValidatesPollInterval(t *testing.T) {
 	path := writeConfig(t, "config.yaml", validConfig)
-	cfg, err := load([]string{path}, func(string) (string, bool) { return "", false })
+	cfg, err := load([]string{path}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +136,7 @@ func TestLoadAppliesAndValidatesPollInterval(t *testing.T) {
 	}
 	custom := strings.Replace(validConfig, "version: 1", "version: 1\nreconcile:\n  poll_interval: 30s", 1)
 	path = writeConfig(t, "custom.yaml", custom)
-	cfg, err = load([]string{path}, func(string) (string, bool) { return "", false })
+	cfg, err = load([]string{path}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +145,7 @@ func TestLoadAppliesAndValidatesPollInterval(t *testing.T) {
 	}
 
 	path = writeConfig(t, "invalid.yaml", "reconcile:\n  poll_interval: 0s\n"+validConfig)
-	_, err = load([]string{path}, func(string) (string, bool) { return "", false })
+	_, err = load([]string{path}, nil)
 	if err == nil || !strings.Contains(err.Error(), "reconcile.poll_interval must be greater than zero") {
 		t.Fatalf("Load error = %v, want poll interval error", err)
 	}
@@ -119,7 +153,7 @@ func TestLoadAppliesAndValidatesPollInterval(t *testing.T) {
 
 func TestLoadRejectsUnknownFields(t *testing.T) {
 	path := writeConfig(t, "config.yaml", validConfig+"unexpected: true\n")
-	_, err := load([]string{path}, func(string) (string, bool) { return "", false })
+	_, err := load([]string{path}, nil)
 	if err == nil || !strings.Contains(err.Error(), "field unexpected not found") {
 		t.Fatalf("Load error = %v, want unknown-field error", err)
 	}
@@ -127,7 +161,7 @@ func TestLoadRejectsUnknownFields(t *testing.T) {
 
 func TestLoadRequiresWholeValueEnvironmentPlaceholders(t *testing.T) {
 	path := writeConfig(t, "config.yaml", strings.Replace(validConfig, "tenant_id: tenant", "tenant_id: prefix-${TENANT_ID}", 1))
-	_, err := load([]string{path}, func(string) (string, bool) { return "value", true })
+	_, err := load([]string{path}, map[string]string{"TENANT_ID": "value"})
 	if err == nil || !strings.Contains(err.Error(), "must occupy an entire YAML scalar") {
 		t.Fatalf("Load error = %v, want whole-scalar error", err)
 	}
@@ -135,7 +169,7 @@ func TestLoadRequiresWholeValueEnvironmentPlaceholders(t *testing.T) {
 
 func TestLoadCompilesTypedPolicy(t *testing.T) {
 	path := writeConfig(t, "config.yaml", strings.Replace(validConfig, `include_when: user.given_name != ""`, "include_when: user.given_name", 1))
-	_, err := load([]string{path}, func(string) (string, bool) { return "", false })
+	_, err := load([]string{path}, nil)
 	if err == nil || !strings.Contains(err.Error(), "want bool") {
 		t.Fatalf("Load error = %v, want CEL type error", err)
 	}
@@ -143,7 +177,7 @@ func TestLoadCompilesTypedPolicy(t *testing.T) {
 
 func TestLoadRejectsDuplicateSourcePriority(t *testing.T) {
 	path := writeConfig(t, "config.yaml", strings.Replace(validConfig, "priority: 50", "priority: 100", 1))
-	_, err := load([]string{path}, func(string) (string, bool) { return "", false })
+	_, err := load([]string{path}, nil)
 	if err == nil || !strings.Contains(err.Error(), "priority 100 is duplicated") {
 		t.Fatalf("Load error = %v, want duplicate priority error", err)
 	}

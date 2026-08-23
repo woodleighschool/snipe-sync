@@ -47,9 +47,6 @@ target:
   connection: snipe
   timezone: Australia/Melbourne
 
-reconcile:
-  poll_interval: 1m
-
 users:
   include_when: user.present
   location:

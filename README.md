@@ -15,6 +15,7 @@ Download an archive from the [latest release](https://github.com/woodleighschool
 ```bash
 snipe-sync validate
 snipe-sync plan
+snipe-sync plan --all
 snipe-sync plan --output json
 snipe-sync run --once
 snipe-sync run
@@ -66,7 +67,7 @@ Intune, Jamf, and Snipe-IT remain complete bulk snapshots each cycle. Cycles run
 
 Users are created first, followed by updates and disables. IDs returned for new users are then available to asset assignment. All asset patches complete before check-ins begin, and all check-ins complete before checkouts begin. An item failure stops later actions for that asset while independent items continue.
 
-Human plans include user counts and a complete device table. JSON output is one structured plan object suitable for automated comparison.
+Human plans include user counts and device rows that change or require attention. Use `plan --all` to include unchanged devices. JSON output always contains the complete structured plan.
 
 ## 🧑‍💻 Development
 

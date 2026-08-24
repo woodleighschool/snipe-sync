@@ -64,6 +64,7 @@ func newValidateCommand(configPaths *[]string) *cobra.Command {
 }
 
 func newPlanCommand(configPaths *[]string) *cobra.Command {
+	var includeUnchanged bool
 	var output string
 	command := &cobra.Command{
 		Use:   "plan",
@@ -81,9 +82,10 @@ func newPlanCommand(configPaths *[]string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return writePlan(command.OutOrStdout(), output, result.Plan)
+			return writePlan(command.OutOrStdout(), output, includeUnchanged, result.Plan)
 		},
 	}
+	command.Flags().BoolVar(&includeUnchanged, "all", false, "include unchanged devices in human output")
 	command.Flags().StringVar(&output, "output", "human", "plan output format: human or json")
 	return command
 }

@@ -12,22 +12,24 @@ import (
 
 func TestWriteJSONPlanProducesOneCompleteObject(t *testing.T) {
 	plan := outputFixture()
-	var output bytes.Buffer
-	if err := writePlan(&output, "json", plan); err != nil {
-		t.Fatal(err)
-	}
-	var decoded planner.Plan
-	if err := json.Unmarshal(output.Bytes(), &decoded); err != nil {
-		t.Fatal(err)
-	}
-	if len(decoded.Users) != 1 || len(decoded.Assets) != 2 {
-		t.Errorf("decoded plan = %#v", decoded)
+	for _, all := range []bool{false, true} {
+		var output bytes.Buffer
+		if err := writePlan(&output, "json", all, plan); err != nil {
+			t.Fatal(err)
+		}
+		var decoded planner.Plan
+		if err := json.Unmarshal(output.Bytes(), &decoded); err != nil {
+			t.Fatal(err)
+		}
+		if len(decoded.Users) != 1 || len(decoded.Assets) != 4 {
+			t.Errorf("all %t: decoded plan = %#v", all, decoded)
+		}
 	}
 }
 
-func TestWriteHumanPlanUsesComparisonColumnsAndSummaries(t *testing.T) {
+func TestWriteHumanPlanShowsChangesAndSkippedAssets(t *testing.T) {
 	var output bytes.Buffer
-	if err := writePlan(&output, "human", outputFixture()); err != nil {
+	if err := writePlan(&output, "human", false, outputFixture()); err != nil {
 		t.Fatal(err)
 	}
 	text := output.String()
@@ -36,14 +38,31 @@ func TestWriteHumanPlanUsesComparisonColumnsAndSummaries(t *testing.T) {
 		"SOURCE", "SERIAL", "ASSIGNMENT", "MANAGED BY", "RESULT",
 		"OLD → NEW", "old@example.invalid → new@example.invalid", "name, managed by, reassign",
 		"Skip: missing in Snipe",
-		"Device summary: 2 total, 1 change, 0 unchanged, 1 skipped",
+		"SERIAL-4", "No change; primary user unresolved; checkout preserved",
+		"Device summary: 4 total, 1 change, 2 unchanged, 1 skipped",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("human plan missing %q:\n%s", want, text)
 		}
 	}
+	if strings.Contains(text, "SERIAL-3") {
+		t.Errorf("human plan contains unchanged asset:\n%s", text)
+	}
 	if strings.Contains(text, "\t") {
 		t.Errorf("human plan contains tabs: %q", text)
+	}
+}
+
+func TestWriteHumanPlanAllIncludesUnchangedAssets(t *testing.T) {
+	var output bytes.Buffer
+	if err := writePlan(&output, "human", true, outputFixture()); err != nil {
+		t.Fatal(err)
+	}
+	text := output.String()
+	for _, want := range []string{"SERIAL-3", "No change", "Device summary: 4 total, 1 change, 2 unchanged, 1 skipped"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("complete human plan missing %q:\n%s", want, text)
+		}
 	}
 }
 
@@ -62,6 +81,8 @@ func outputFixture() planner.Plan {
 				CheckoutUser: "new@example.invalid", Result: planner.AssetChange,
 			},
 			{Source: "secondary", SerialNumber: "SERIAL-2", Result: planner.AssetSkipped, SkipReason: "missing in Snipe"},
+			{Source: "primary", SerialNumber: "SERIAL-3", CurrentName: "CURRENT", DesiredName: "CURRENT", Result: planner.AssetUnchanged},
+			{Source: "primary", SerialNumber: "SERIAL-4", CurrentName: "CURRENT", DesiredName: "CURRENT", Result: planner.AssetUnchanged, Note: "primary user unresolved; checkout preserved"},
 		},
 	}
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/woodleighschool/snipe-sync/internal/planner"
 )
 
-func writePlan(writer io.Writer, output string, plan planner.Plan) error {
+func writePlan(writer io.Writer, output string, includeUnchanged bool, plan planner.Plan) error {
 	if output == "json" {
 		encoder := json.NewEncoder(writer)
 		encoder.SetEscapeHTML(false)
@@ -19,10 +19,10 @@ func writePlan(writer io.Writer, output string, plan planner.Plan) error {
 		}
 		return nil
 	}
-	return writeHumanPlan(writer, plan)
+	return writeHumanPlan(writer, includeUnchanged, plan)
 }
 
-func writeHumanPlan(writer io.Writer, plan planner.Plan) error {
+func writeHumanPlan(writer io.Writer, includeUnchanged bool, plan planner.Plan) error {
 	for _, warning := range plan.Warnings {
 		if _, err := fmt.Fprintf(writer, "Warning: %s\n", warning); err != nil {
 			return fmt.Errorf("write warning: %w", err)
@@ -44,6 +44,9 @@ func writeHumanPlan(writer io.Writer, plan planner.Plan) error {
 		return fmt.Errorf("write device header: %w", err)
 	}
 	for _, asset := range plan.Assets {
+		if !includeUnchanged && asset.Result == planner.AssetUnchanged && asset.Note == "" {
+			continue
+		}
 		if _, err := fmt.Fprintf(
 			table,
 			"%s\t%s\t%s\t%s\t%s\t%s\t%s\n",

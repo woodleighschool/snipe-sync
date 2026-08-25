@@ -26,8 +26,9 @@ func TestValidateLoadsOrderedConfigurationFiles(t *testing.T) {
 	directory := t.TempDir()
 	basePath := writeCommandConfig(t, directory, "base.yaml", commandConfig)
 	overlayPath := writeCommandConfig(t, directory, "overlay.yaml", `assets:
-  assignment:
-    shared_when: device.name.startsWith("SHARED-")
+  skip:
+    - when: device.serial_number == "FIELD-SKIP"
+      fields: [name]
 `)
 	command := newRootCommand()
 	command.SetArgs([]string{"validate", "--config", basePath, "--config", overlayPath})

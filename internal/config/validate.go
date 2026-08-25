@@ -26,9 +26,6 @@ func (c *Config) applyDefaults() {
 	if strings.TrimSpace(c.Users.IncludeWhen) == "" {
 		c.Users.IncludeWhen = "true"
 	}
-	if strings.TrimSpace(c.Assets.Assignment.SharedWhen) == "" {
-		c.Assets.Assignment.SharedWhen = "false"
-	}
 	for index := range c.Devices {
 		if strings.TrimSpace(c.Devices[index].ManagedBy) == "" {
 			c.Devices[index].ManagedBy = c.Devices[index].Name
@@ -282,9 +279,29 @@ func (c *Config) validatePolicy() error {
 	if err != nil {
 		return err
 	}
-	programs.SharedAsset, err = assetCompiler.CompileCondition(c.Assets.Assignment.SharedWhen)
-	if err != nil {
-		return fmt.Errorf("assets.assignment.shared_when: %w", err)
+	programs.AssetSkips = make([]AssetSkipProgram, 0, len(c.Assets.Skip))
+	for index, rule := range c.Assets.Skip {
+		path := fmt.Sprintf("assets.skip[%d]", index)
+		if len(rule.Fields) == 0 {
+			return fmt.Errorf("%s.fields must not be empty", path)
+		}
+		seen := make(map[AssetField]struct{}, len(rule.Fields))
+		for fieldIndex, field := range rule.Fields {
+			switch field {
+			case AssetFieldName, AssetFieldManagedBy, AssetFieldAssignment:
+			default:
+				return fmt.Errorf("%s.fields[%d]: unsupported field %q", path, fieldIndex, field)
+			}
+			if _, exists := seen[field]; exists {
+				return fmt.Errorf("%s.fields contains duplicate %q", path, field)
+			}
+			seen[field] = struct{}{}
+		}
+		program, compileErr := assetCompiler.CompileCondition(rule.When)
+		if compileErr != nil {
+			return fmt.Errorf("%s.when: %w", path, compileErr)
+		}
+		programs.AssetSkips = append(programs.AssetSkips, AssetSkipProgram{When: program, Fields: rule.Fields})
 	}
 	c.Programs = programs
 	return nil

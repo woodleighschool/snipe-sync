@@ -87,13 +87,13 @@ type UserAbsent struct {
 	Department string `yaml:"department"`
 }
 
-// AssetPolicy controls target eligibility, status transitions, assignment, and absence handling.
+// AssetPolicy controls target eligibility, status transitions, field reconciliation, and absence handling.
 type AssetPolicy struct {
-	Manufacturers  []string         `yaml:"manufacturers"    jsonschema:"minItems=1,uniqueItems=true"`
-	Statuses       AssetStatuses    `yaml:"statuses"`
-	ManagedByField string           `yaml:"managed_by_field"`
-	Assignment     AssignmentPolicy `yaml:"assignment,omitempty"`
-	Absent         AssetAbsent      `yaml:"absent,omitempty"`
+	Manufacturers  []string        `yaml:"manufacturers"    jsonschema:"minItems=1,uniqueItems=true"`
+	Statuses       AssetStatuses   `yaml:"statuses"`
+	ManagedByField string          `yaml:"managed_by_field"`
+	Skip           []AssetSkipRule `yaml:"skip,omitempty"`
+	Absent         AssetAbsent     `yaml:"absent,omitempty"`
 }
 
 // AssetStatuses identifies writable states and one optional promotion.
@@ -108,9 +108,20 @@ type StatusPromotion struct {
 	To   string   `yaml:"to,omitempty"`
 }
 
-// AssignmentPolicy contains the shared-device preservation condition.
-type AssignmentPolicy struct {
-	SharedWhen string `yaml:"shared_when,omitempty"`
+// AssetField identifies a target field whose reconciliation can be suppressed.
+type AssetField string
+
+// Asset fields supported by conditional skip rules.
+const (
+	AssetFieldName       AssetField = "name"
+	AssetFieldManagedBy  AssetField = "managed_by"
+	AssetFieldAssignment AssetField = "assignment"
+)
+
+// AssetSkipRule suppresses selected field mutations when its condition matches.
+type AssetSkipRule struct {
+	When   string       `yaml:"when"`
+	Fields []AssetField `yaml:"fields" jsonschema:"minItems=1,uniqueItems=true,enum=name,enum=managed_by,enum=assignment"`
 }
 
 // AssetAbsent enables destructive lifecycle actions for assets absent from every configured source.
@@ -122,7 +133,13 @@ type AssetAbsent struct {
 type Programs struct {
 	UserInclude expression.Program
 	Locations   []expression.Program
-	SharedAsset expression.Program
+	AssetSkips  []AssetSkipProgram
+}
+
+// AssetSkipProgram is one compiled asset field skip rule.
+type AssetSkipProgram struct {
+	When   expression.Program
+	Fields []AssetField
 }
 
 // Duration is a configuration duration parsed with time.ParseDuration.

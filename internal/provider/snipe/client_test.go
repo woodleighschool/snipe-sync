@@ -30,9 +30,9 @@ func TestSnapshotReadsCompleteNormalizedTargetState(t *testing.T) {
 				"department": map[string]any{"id": 2}, "location": map[string]any{"id": 3},
 			}}
 		case "/api/v1/departments":
-			rows = []any{map[string]any{"id": 2, "name": "Staff"}}
+			rows = []any{map[string]any{"id": 2, "name": "Department A"}}
 		case "/api/v1/locations":
-			rows = []any{map[string]any{"id": 3, "name": "Main Campus"}}
+			rows = []any{map[string]any{"id": 3, "name": "Location A"}}
 		case "/api/v1/statuslabels":
 			rows = []any{
 				map[string]any{"id": 2, "name": "Ready", "type": "deployable"},
@@ -74,7 +74,7 @@ func TestSnapshotReadsCompleteNormalizedTargetState(t *testing.T) {
 	if got, want := snapshot.ManagedBy.DBColumn, "_snipeit_managed_by_5"; got != want {
 		t.Errorf("custom field column = %q, want %q", got, want)
 	}
-	if got := snapshot.Departments.Entries()["staff"]; len(got) != 1 || got[0].ID != 2 {
+	if got := snapshot.Departments.Entries()["department a"]; len(got) != 1 || got[0].ID != 2 {
 		t.Errorf("department entries = %#v", got)
 	}
 }

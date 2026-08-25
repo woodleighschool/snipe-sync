@@ -17,9 +17,9 @@ func TestPlannerReconcilesUsersAndPreservesIncompleteLocation(t *testing.T) {
 	createdAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	input := plannerInput()
 	input.Users = []domain.User{
-		{Present: true, GivenName: "New", Surname: "User", MailNickname: "new", UserPrincipalName: "NEW@EXAMPLE.INVALID", Department: "Staff", CreatedAt: createdAt, Groups: []string{"staff"}, GroupsComplete: true},
-		{Present: true, GivenName: "Casey", Surname: "Changed", MailNickname: "casey", UserPrincipalName: "casey@example.invalid", Department: "Staff", GroupsComplete: false},
-		{Present: true, GivenName: "Same", Surname: "User", MailNickname: "same", UserPrincipalName: "same@example.invalid", Department: "Staff", Groups: []string{"staff"}, GroupsComplete: true},
+		{Present: true, GivenName: "New", Surname: "User", MailNickname: "new", UserPrincipalName: "NEW@EXAMPLE.INVALID", Department: "Department A", CreatedAt: createdAt, Groups: []string{"group_a"}, GroupsComplete: true},
+		{Present: true, GivenName: "Casey", Surname: "Changed", MailNickname: "casey", UserPrincipalName: "casey@example.invalid", Department: "Department A", GroupsComplete: false},
+		{Present: true, GivenName: "Same", Surname: "User", MailNickname: "same", UserPrincipalName: "same@example.invalid", Department: "Department A", Groups: []string{"group_a"}, GroupsComplete: true},
 	}
 	input.TargetUsers = map[string]domain.TargetUser{
 		"casey@example.invalid": {ID: 1, Email: "casey@example.invalid", GivenName: "Casey", Surname: "Old", Username: "casey", DepartmentID: 2, LocationID: 99},
@@ -105,20 +105,26 @@ func TestPlannerPreservesAndChangesAssignmentsAtEvidenceBoundary(t *testing.T) {
 			{ID: "created", SerialNumber: "CREATED", Name: "DEVICE", PrimaryUserPrincipalName: "created@example.invalid"},
 			{ID: "missing", SerialNumber: "MISSING-USER", Name: "DEVICE", PrimaryUserPrincipalName: "missing@example.invalid"},
 			{ID: "blank", SerialNumber: "BLANK", Name: ""},
-			{ID: "shared", SerialNumber: "SHARED", Name: "SHARED-CART"},
+			{ID: "field-skip", SerialNumber: "FIELD-SKIP", Name: "DESIRED"},
 			{ID: "checkin", SerialNumber: "CHECKIN", Name: "ORDINARY"},
 			{ID: "correct", SerialNumber: "CORRECT", Name: "DEVICE", PrimaryUserPrincipalName: "desired@example.invalid"},
 		},
 		"secondary": {},
 	}
 	input.Assets = map[string]domain.Asset{}
-	for index, serial := range []string{"REASSIGN", "CREATED", "MISSING-USER", "BLANK", "SHARED", "CHECKIN", "CORRECT"} {
+	for index, serial := range []string{"REASSIGN", "CREATED", "MISSING-USER", "BLANK", "FIELD-SKIP", "CHECKIN", "CORRECT"} {
 		input.Assets[serial] = domain.Asset{
 			ID: int64(index + 1), SerialNumber: serial, Name: input.DevicesBySource["primary"][index].Name,
 			Manufacturer: "Example Computers", Status: "Ready", StatusID: 2,
 			AssignedToID: 11, AssignedToType: "user", AssignedEmail: "current@example.invalid", ManagedBy: "Primary MDM",
 		}
 	}
+	fieldSkipAsset := input.Assets["FIELD-SKIP"]
+	fieldSkipAsset.Name = "CURRENT"
+	fieldSkipAsset.ManagedBy = "Other MDM"
+	fieldSkipAsset.Status = "Stock"
+	fieldSkipAsset.StatusID = 6
+	input.Assets["FIELD-SKIP"] = fieldSkipAsset
 	correct := input.Assets["CORRECT"]
 	correct.AssignedToID = 10
 	correct.AssignedEmail = "desired@example.invalid"
@@ -141,8 +147,15 @@ func TestPlannerPreservesAndChangesAssignmentsAtEvidenceBoundary(t *testing.T) {
 	if assets["BLANK"].Checkin || !strings.Contains(assets["BLANK"].Note, "blank MDM") {
 		t.Errorf("blank-name preservation = %#v", assets["BLANK"])
 	}
-	if assets["SHARED"].Checkin || !strings.Contains(assets["SHARED"].Note, "shared-device") {
-		t.Errorf("shared-device preservation = %#v", assets["SHARED"])
+	fieldSkip := assets["FIELD-SKIP"]
+	if fieldSkip.Checkin || fieldSkip.Patch.Name != nil || fieldSkip.Patch.ManagedBy != nil || fieldSkip.Result != planner.AssetChange {
+		t.Errorf("field skip = %#v", fieldSkip)
+	}
+	if fieldSkip.Patch.StatusID == nil || *fieldSkip.Patch.StatusID != 2 {
+		t.Errorf("field skip status promotion = %v, want 2", fieldSkip.Patch.StatusID)
+	}
+	if got, want := fieldSkip.Note, "name, managed_by, assignment skipped by policy"; got != want {
+		t.Errorf("field skip note = %q, want %q", got, want)
 	}
 	if !assets["CHECKIN"].Checkin || assets["CHECKIN"].CheckoutUser != "" {
 		t.Errorf("ordinary checkin = %#v", assets["CHECKIN"])
@@ -158,18 +171,18 @@ func TestPlannerPromotesSkipsAndReconcilesAbsentAssets(t *testing.T) {
 	input.DevicesBySource = map[string][]domain.Device{
 		"primary": {
 			{ID: "stock", SerialNumber: "STOCK", Name: "DEVICE"},
-			{ID: "blocked", SerialNumber: "BLOCKED", Name: "DEVICE"},
+			{ID: "blocked", SerialNumber: "FIELD-SKIP-BLOCKED", Name: "DEVICE"},
 			{ID: "archived", SerialNumber: "ARCHIVED", Name: "DEVICE"},
 			{ID: "unsupported", SerialNumber: "UNSUPPORTED", Name: "DEVICE"},
 		},
 		"secondary": {},
 	}
 	input.Assets = map[string]domain.Asset{
-		"STOCK":       {ID: 1, SerialNumber: "STOCK", Manufacturer: "Example Computers", Status: "Stock", StatusID: 6},
-		"BLOCKED":     {ID: 2, SerialNumber: "BLOCKED", Manufacturer: "Example Computers", Status: "Repair", StatusID: 7},
-		"ARCHIVED":    {ID: 3, SerialNumber: "ARCHIVED", Manufacturer: "Example Computers", Status: "Archived", StatusID: 3, Archived: true},
-		"UNSUPPORTED": {ID: 4, SerialNumber: "UNSUPPORTED", Manufacturer: "Other Vendor", Status: "Ready", StatusID: 2},
-		"ABSENT":      {ID: 5, SerialNumber: "ABSENT", Name: "OLD", Manufacturer: "Example Computers", Status: "Repair", StatusID: 7, ManagedBy: "Primary MDM", AssignedToID: 11, AssignedToType: "user"},
+		"STOCK":              {ID: 1, SerialNumber: "STOCK", Manufacturer: "Example Computers", Status: "Stock", StatusID: 6},
+		"FIELD-SKIP-BLOCKED": {ID: 2, SerialNumber: "FIELD-SKIP-BLOCKED", Manufacturer: "Example Computers", Status: "Repair", StatusID: 7},
+		"ARCHIVED":           {ID: 3, SerialNumber: "ARCHIVED", Manufacturer: "Example Computers", Status: "Archived", StatusID: 3, Archived: true},
+		"UNSUPPORTED":        {ID: 4, SerialNumber: "UNSUPPORTED", Manufacturer: "Other Vendor", Status: "Ready", StatusID: 2},
+		"ABSENT":             {ID: 5, SerialNumber: "ABSENT", Name: "OLD", Manufacturer: "Example Computers", Status: "Repair", StatusID: 7, ManagedBy: "Primary MDM", AssignedToID: 11, AssignedToType: "user"},
 	}
 
 	plan, err := engine.Plan(input)
@@ -180,7 +193,11 @@ func TestPlannerPromotesSkipsAndReconcilesAbsentAssets(t *testing.T) {
 	if got := assets["STOCK"].Patch.StatusID; got == nil || *got != 2 {
 		t.Errorf("stock promotion = %v, want status 2", got)
 	}
-	if got := assets["BLOCKED"].SkipReason; got != "Repair blocks sync" {
+	blocked := assets["FIELD-SKIP-BLOCKED"]
+	if blocked.Result != planner.AssetSkipped || blocked.HasChanges() {
+		t.Errorf("blocked field skip = %#v", blocked)
+	}
+	if got := blocked.SkipReason; got != "Repair blocks sync" {
 		t.Errorf("blocked reason = %q", got)
 	}
 	if assets["ARCHIVED"].SkipReason != "archived" || !strings.Contains(assets["UNSUPPORTED"].SkipReason, "unsupported") {
@@ -218,8 +235,8 @@ func newPlanner(t *testing.T, absent bool) *planner.Planner {
 		t.Fatal(err)
 	}
 	result, err := planner.New(cfg, planner.Metadata{
-		Departments:   map[string][]int64{"staff": {2}, "disabled": {17}},
-		Locations:     map[string][]int64{"main campus": {3}},
+		Departments:   map[string][]int64{"department a": {2}, "disabled": {17}},
+		Locations:     map[string][]int64{"location a": {3}},
 		Statuses:      map[string][]int64{"ready": {2}, "stock": {6}, "archived": {3}, "repair": {7}},
 		Manufacturers: map[string]int{"example computers": 1, "other vendor": 1},
 	})
@@ -276,7 +293,7 @@ identity:
   connection: microsoft
   domains: [example.invalid]
   groups:
-    staff: [group-1]
+    group_a: [group-1]
 devices:
   - name: primary
     type: intune
@@ -296,8 +313,8 @@ users:
   include_when: user.given_name != ""
   location:
     cases:
-      - when: '"staff" in user.groups'
-        value: Main Campus
+      - when: '"group_a" in user.groups'
+        value: Location A
   absent:
     department: Disabled
 assets:
@@ -308,8 +325,11 @@ assets:
       from: [Stock]
       to: Ready
   managed_by_field: Managed By
-  assignment:
-    shared_when: device.name.startsWith("SHARED-")
+  skip:
+    - when: device.serial_number.startsWith("FIELD-SKIP")
+      fields: [name]
+    - when: device.serial_number.startsWith("FIELD-SKIP")
+      fields: [managed_by, assignment]
   absent:
     enabled: ABSENT_ENABLED
 `

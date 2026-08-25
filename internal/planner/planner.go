@@ -39,7 +39,7 @@ type Planner struct {
 	writableStatuses     map[int64]struct{}
 	promoteStatuses      map[int64]int64
 	promoteTargetName    string
-	sharedAsset          expression.Program
+	assetSkips           []config.AssetSkipProgram
 	absentAssets         bool
 }
 
@@ -62,7 +62,7 @@ func New(cfg *config.Config, metadata Metadata) (*Planner, error) {
 		writableStatuses:     make(map[int64]struct{}, len(cfg.Assets.Statuses.Writable)),
 		promoteStatuses:      make(map[int64]int64, len(cfg.Assets.Statuses.Promote.From)),
 		promoteTargetName:    cfg.Assets.Statuses.Promote.To,
-		sharedAsset:          cfg.Programs.SharedAsset,
+		assetSkips:           cfg.Programs.AssetSkips,
 		absentAssets:         cfg.Assets.Absent.Enabled,
 	}
 	for _, value := range cfg.Identity.Domains {
@@ -354,6 +354,7 @@ func (p *Planner) planPresentAsset(
 		plan.DesiredManagedBy = desiredManagedBy
 	}
 
+	assignmentNote := ""
 	desiredUser := normalizeEmail(device.PrimaryUserPrincipalName)
 	if desiredUser != "" {
 		target, targetExists := targetUsers[desiredUser]
@@ -366,7 +367,7 @@ func (p *Planner) planPresentAsset(
 			plan.CheckoutAt = device.EnrolledAt
 			plan.DesiredAssignment = desiredUser
 			if createPlanned {
-				plan.Note = "checkout follows planned user create"
+				assignmentNote = "checkout follows planned user create"
 			}
 		}
 	} else if asset.AssignedToID != 0 {
@@ -374,22 +375,70 @@ func (p *Planner) planPresentAsset(
 		case "":
 			plan.Note = "blank MDM name and primary user; checkout preserved"
 		default:
-			shared, err := p.sharedAsset.Eval(expression.Input{Device: &device, Asset: &asset})
-			if err != nil {
-				return AssetPlan{}, fmt.Errorf("evaluate shared-device policy for %s: %w", device.SerialNumber, err)
-			}
-			if shared {
-				plan.Note = "shared-device checkout preserved"
-			} else {
-				plan.Checkin = true
-				plan.DesiredAssignment = ""
-			}
+			plan.Checkin = true
+			plan.DesiredAssignment = ""
 		}
+	}
+	skippedFields, err := p.applyAssetFieldSkips(&plan, device, asset)
+	if err != nil {
+		return AssetPlan{}, err
+	}
+	if assignmentNote != "" && (plan.Checkin || plan.CheckoutUser != "") {
+		plan.Note = appendPlanNote(plan.Note, assignmentNote)
+	}
+	if len(skippedFields) != 0 {
+		names := make([]string, 0, len(skippedFields))
+		for _, field := range skippedFields {
+			names = append(names, string(field))
+		}
+		plan.Note = appendPlanNote(plan.Note, strings.Join(names, ", ")+" skipped by policy")
 	}
 	if plan.HasChanges() {
 		plan.Result = AssetChange
 	}
 	return plan, nil
+}
+
+func (p *Planner) applyAssetFieldSkips(plan *AssetPlan, device domain.Device, asset domain.Asset) ([]config.AssetField, error) {
+	matches := make(map[config.AssetField]struct{})
+	for index, rule := range p.assetSkips {
+		matched, err := rule.When.Eval(expression.Input{Device: &device, Asset: &asset})
+		if err != nil {
+			return nil, fmt.Errorf("evaluate assets.skip[%d] for %s: %w", index, device.SerialNumber, err)
+		}
+		if matched {
+			for _, field := range rule.Fields {
+				matches[field] = struct{}{}
+			}
+		}
+	}
+
+	skipped := make([]config.AssetField, 0, len(matches))
+	if _, ok := matches[config.AssetFieldName]; ok && plan.Patch.Name != nil {
+		plan.Patch.Name = nil
+		plan.DesiredName = plan.CurrentName
+		skipped = append(skipped, config.AssetFieldName)
+	}
+	if _, ok := matches[config.AssetFieldManagedBy]; ok && plan.Patch.ManagedBy != nil {
+		plan.Patch.ManagedBy = nil
+		plan.DesiredManagedBy = plan.CurrentManagedBy
+		skipped = append(skipped, config.AssetFieldManagedBy)
+	}
+	if _, ok := matches[config.AssetFieldAssignment]; ok && (plan.Checkin || plan.CheckoutUser != "") {
+		plan.Checkin = false
+		plan.CheckoutUser = ""
+		plan.CheckoutAt = time.Time{}
+		plan.DesiredAssignment = plan.CurrentAssignment
+		skipped = append(skipped, config.AssetFieldAssignment)
+	}
+	return skipped, nil
+}
+
+func appendPlanNote(current, note string) string {
+	if current == "" {
+		return note
+	}
+	return current + "; " + note
 }
 
 func (p *Planner) internalEmail(email string) bool {

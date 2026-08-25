@@ -31,7 +31,7 @@ identity:
   connection: microsoft
   domains: [example.invalid]
   groups:
-    staff: [group-1]
+    group_a: [group-1]
 devices:
   - name: primary
     type: intune
@@ -49,8 +49,8 @@ users:
   include_when: user.given_name != ""
   location:
     cases:
-      - when: '"staff" in user.groups'
-        value: Main Campus
+      - when: '"group_a" in user.groups'
+        value: Location A
   absent:
     department: Disabled
 assets:
@@ -61,8 +61,9 @@ assets:
       from: [Stock]
       to: Ready
   managed_by_field: Managed By
-  assignment:
-    shared_when: device.name.startsWith("SHARED-")
+  skip:
+    - when: device.serial_number == "FIELD-SKIP"
+      fields: [assignment]
   absent:
     enabled: true
 `
@@ -172,6 +173,39 @@ func TestLoadCompilesTypedPolicy(t *testing.T) {
 	_, err := load([]string{path}, nil)
 	if err == nil || !strings.Contains(err.Error(), "want bool") {
 		t.Fatalf("Load error = %v, want CEL type error", err)
+	}
+}
+
+func TestLoadCompilesTypedAssetFieldSkipPolicy(t *testing.T) {
+	path := writeConfig(t, "config.yaml", strings.Replace(
+		validConfig,
+		`device.serial_number == "FIELD-SKIP"`,
+		"device.name",
+		1,
+	))
+	_, err := load([]string{path}, nil)
+	if err == nil || !strings.Contains(err.Error(), "assets.skip[0].when") || !strings.Contains(err.Error(), "want bool") {
+		t.Fatalf("Load error = %v, want asset skip CEL type error", err)
+	}
+}
+
+func TestLoadRejectsInvalidAssetSkipFields(t *testing.T) {
+	tests := map[string]struct {
+		fields string
+		error  string
+	}{
+		"empty":     {fields: "[]", error: "assets.skip[0].fields must not be empty"},
+		"duplicate": {fields: "[name, name]", error: `assets.skip[0].fields contains duplicate "name"`},
+		"unknown":   {fields: "[serial_number]", error: `assets.skip[0].fields[0]: unsupported field "serial_number"`},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, "config.yaml", strings.Replace(validConfig, "[assignment]", test.fields, 1))
+			_, err := load([]string{path}, nil)
+			if err == nil || !strings.Contains(err.Error(), test.error) {
+				t.Fatalf("Load error = %v, want %q", err, test.error)
+			}
+		})
 	}
 }
 

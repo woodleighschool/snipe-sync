@@ -55,7 +55,7 @@ Runtime settings resolve from `SNIPE_SYNC_*` environment variables, then the cor
 | `users`       | Selection, location, and disabled-user policy            |
 | `assets`      | Eligibility, status, assignment, and absence policy      |
 
-User selection, first-match location rules, and shared-device preservation use typed CEL expressions. Human-readable Snipe departments, locations, manufacturers, statuses, and the managed-by custom-field label are resolved from each complete target snapshot. Numeric IDs and generated custom-field column names do not belong in configuration.
+User selection, first-match location rules, and asset field skip rules use typed CEL expressions. Each `assets.skip` rule has a `when` condition and one or more `fields`: `name`, `managed_by`, or `assignment`. Matching rules suppress only fields that would otherwise change. Human-readable Snipe departments, locations, manufacturers, statuses, and the managed-by custom-field label are resolved from each complete target snapshot. Numeric IDs and generated custom-field column names do not belong in configuration.
 
 [`snipe-sync.schema.json`](snipe-sync.schema.json) provides the structural YAML contract for editors.
 

@@ -65,7 +65,7 @@ func TestEntraSourceMaterializesUserDelta(t *testing.T) {
 			return []string{"user-1", "user-3"}, nil
 		},
 	}
-	source := newEntraSource(client, []string{"example.invalid"}, map[string][]string{"staff": {"group-1"}})
+	source := newEntraSource(client, []string{"example.invalid"}, map[string][]string{"group_a": {"group-1"}})
 
 	first, warnings, err := source.ListUsers(context.Background())
 	if err != nil {
@@ -77,7 +77,7 @@ func TestEntraSourceMaterializesUserDelta(t *testing.T) {
 	if got, want := userEmails(first), []string{"casey@example.invalid", "taylor@example.invalid"}; !slices.Equal(got, want) {
 		t.Fatalf("first users = %v, want %v", got, want)
 	}
-	if got, want := first[0].Groups, []string{"staff"}; !slices.Equal(got, want) {
+	if got, want := first[0].Groups, []string{"group_a"}; !slices.Equal(got, want) {
 		t.Errorf("first groups = %v, want %v", got, want)
 	}
 	if !first[0].GroupsComplete || !first[1].GroupsComplete {
@@ -116,7 +116,7 @@ func TestEntraSourceOnlyCommitsCompleteRound(t *testing.T) {
 			return []string{"user-1"}, nil
 		},
 	}
-	source := newEntraSource(client, []string{"example.invalid"}, map[string][]string{"staff": {"group-1"}})
+	source := newEntraSource(client, []string{"example.invalid"}, map[string][]string{"group_a": {"group-1"}})
 
 	if _, _, err := source.ListUsers(context.Background()); err == nil {
 		t.Fatal("ListUsers succeeded with an incomplete group snapshot")

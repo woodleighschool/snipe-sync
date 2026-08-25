@@ -28,7 +28,7 @@ func TestListEntraUserDeltaReadsCompleteRound(t *testing.T) {
 			}
 			return jsonResponse(http.StatusOK, map[string]any{
 				"value": []map[string]any{
-					{"id": "user-1", "givenName": " Casey ", "surname": " Unit ", "userPrincipalName": " CASEY@EXAMPLE.INVALID ", "mailNickname": " Casey ", "department": " Staff ", "createdDateTime": "2026-01-02T03:04:05Z"},
+					{"id": "user-1", "givenName": " Casey ", "surname": " Unit ", "userPrincipalName": " CASEY@EXAMPLE.INVALID ", "mailNickname": " Casey ", "department": " Department A ", "createdDateTime": "2026-01-02T03:04:05Z"},
 					{"id": "user-2", "@removed": map[string]string{"reason": "deleted"}},
 				},
 				"@odata.nextLink": "https://graph.test/v1.0/users/delta?$skiptoken=next",

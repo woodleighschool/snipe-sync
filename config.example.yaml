@@ -26,7 +26,7 @@ identity:
   domains:
     - example.invalid
   groups:
-    main_campus:
+    group_a:
       - 00000000-0000-0000-0000-000000000001
 
 devices:
@@ -51,8 +51,8 @@ users:
   include_when: user.present
   location:
     cases:
-      - when: '"main_campus" in user.groups'
-        value: Main Campus
+      - when: '"group_a" in user.groups'
+        value: Location A
   absent:
     department: Disabled
 
@@ -67,7 +67,5 @@ assets:
         - Stock
       to: Ready to Deploy
   managed_by_field: Managed By
-  assignment:
-    shared_when: device.name.matches("(?i)(^|-)SHARED(-|$)")
   absent:
     enabled: true

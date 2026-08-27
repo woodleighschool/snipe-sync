@@ -1,5 +1,11 @@
 # snipe-sync
 
+[![Release](https://img.shields.io/github/v/release/woodleighschool/snipe-sync?display_name=tag&sort=semver)](https://github.com/woodleighschool/snipe-sync/releases/latest)
+[![CI](https://github.com/woodleighschool/snipe-sync/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/woodleighschool/snipe-sync/actions/workflows/ci.yaml)
+[![Go](https://img.shields.io/github/go-mod/go-version/woodleighschool/snipe-sync?logo=go)](https://github.com/woodleighschool/snipe-sync/blob/main/go.mod)
+[![Container](https://img.shields.io/badge/container-ghcr.io-2496ED?logo=github&logoColor=white)](https://github.com/orgs/woodleighschool/packages/container/package/snipe-sync)
+[![License](https://img.shields.io/github/license/woodleighschool/snipe-sync)](https://github.com/woodleighschool/snipe-sync/blob/main/LICENSE)
+
 Reconciles Microsoft Entra users and managed devices from Intune and Jamf Pro into Snipe-IT from one YAML policy. It can run once from the command line or continuously as a service.
 
 The command builds one deterministic plan from authoritative provider state and only writes that exact plan when run in apply mode.
@@ -10,20 +16,49 @@ The command builds one deterministic plan from authoritative provider state and 
 
 ## 🚀 Usage
 
-Download an archive from the [latest release](https://github.com/woodleighschool/snipe-sync/releases/latest), or build it with Mise. Start from [`config.example.yaml`](config.example.yaml). If `config.yaml` is present in the current directory, `--config` may be omitted:
+Download CLI archives for macOS, Linux, or Windows from the [latest release](https://github.com/woodleighschool/snipe-sync/releases/latest), or use the container `ghcr.io/woodleighschool/snipe-sync:rolling`.
+
+Start with the example policy and an environment file for its `${...}` values:
 
 ```bash
-snipe-sync validate
-snipe-sync plan
-snipe-sync plan --all
-snipe-sync plan --output json
+cp config.example.yaml config.yaml
+touch .env
+```
+
+Fill `.env` with values for the `${...}` names in `config.yaml`. The container commands below read this file; export the same values in your shell when using a downloaded binary.
+
+| Command                 | Behaviour                                    |
+| ----------------------- | -------------------------------------------- |
+| `snipe-sync validate`   | Validate configuration and exit              |
+| `snipe-sync plan`       | Print a read-only reconciliation plan        |
+| `snipe-sync run --once` | Apply one reconciliation cycle and exit      |
+| `snipe-sync run`        | Apply immediately, then continue on interval |
+
+If `config.yaml` is in the current directory, `--config` may be omitted. Multiple `--config` flags apply overlays in order.
+
+### Run once
+
+```bash
 snipe-sync run --once
+```
+
+The container already selects `run`, so pass only `--once`:
+
+```bash
+docker run --rm \
+  --env-file .env \
+  --volume "$PWD/config.yaml:/config.yaml:ro" \
+  ghcr.io/woodleighschool/snipe-sync:rolling \
+  --once
+```
+
+### Run continuously
+
+```bash
 snipe-sync run
 ```
 
-Multiple `--config` flags apply overlays in order. `plan` is always read-only. `run` applies immediately and continues at `reconcile.poll_interval`; `run --once` applies one cycle and exits.
-
-The published container is the continuous service:
+The container runs continuously by default:
 
 ```bash
 docker run --rm \

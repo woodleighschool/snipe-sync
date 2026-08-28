@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.1.0](https://github.com/woodleighschool/snipe-sync/compare/1.0.0...1.1.0) (2026-08-27)
+
+
+### Features
+
+* **config:** add asset field skip rules ([e6a68d2](https://github.com/woodleighschool/snipe-sync/commit/e6a68d21e8503705b33ccd839063270f7be2ea6c))
+* **plan:** show noteworthy devices by default ([906cde3](https://github.com/woodleighschool/snipe-sync/commit/906cde36d90829111997ebc886bdc510bca8e6f8))
+
+
+### Documentation
+
+* clarify usage and releases ([38d0960](https://github.com/woodleighschool/snipe-sync/commit/38d0960ff1059bd1afda01d441b4501fc5c6128e))
+
+
+### Continuous Integration
+
+* **github-action:** update action docker/github-builder (v1.16.0 → v1.17.0) ([#4](https://github.com/woodleighschool/snipe-sync/issues/4)) ([ac6b45e](https://github.com/woodleighschool/snipe-sync/commit/ac6b45e5c774fdc6cb72e24399ca803ac56642c2))
+
+
+### Miscellaneous Chores
+
+* **mise:** update tool oxfmt (0.64.0 → 0.65.0) ([#5](https://github.com/woodleighschool/snipe-sync/issues/5)) ([5649cd7](https://github.com/woodleighschool/snipe-sync/commit/5649cd761f9a6d7decd263758abeb386f6382a91))
+
 ## 1.0.0 (2026-08-23)
 
 

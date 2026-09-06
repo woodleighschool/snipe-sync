@@ -114,7 +114,6 @@ mise run generate
 mise run test
 mise run lint
 mise run fmt-check
-mise run workflow-lint
 mise run vulncheck
 ```
 

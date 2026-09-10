@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.2.0](https://github.com/woodleighschool/snipe-sync/compare/1.1.0...1.2.0) (2026-09-10)
+
+
+### Features
+
+* **go:** update module github.com/microsoft/kiota-abstractions-go (v1.9.4 → v1.10.0) ([#9](https://github.com/woodleighschool/snipe-sync/issues/9)) ([3d64523](https://github.com/woodleighschool/snipe-sync/commit/3d64523f253b9d7af2da3e7fa85f6caef673dfe4))
+
+
+### Bug Fixes
+
+* **container:** update image golang (1.27.0 → 1.27.1) ([#13](https://github.com/woodleighschool/snipe-sync/issues/13)) ([e22669e](https://github.com/woodleighschool/snipe-sync/commit/e22669e3b2b6ad6166fbaa9b78c0cad5e6d6d867))
+* **go:** update module github.com/azure/azure-sdk-for-go/sdk/azidentity (v1.14.0 → v1.14.1) ([#8](https://github.com/woodleighschool/snipe-sync/issues/8)) ([a24e379](https://github.com/woodleighschool/snipe-sync/commit/a24e379b4ff7ee42dee65f14f9142afe6d17ac5e))
+* **go:** update module github.com/microsoft/kiota-abstractions-go (v1.10.0 → v1.10.1) ([#12](https://github.com/woodleighschool/snipe-sync/issues/12)) ([0d6542c](https://github.com/woodleighschool/snipe-sync/commit/0d6542c2369697626ffa464ca46104bf314da4c1))
+
+
+### Continuous Integration
+
+* **github-action:** update action jdx/mise-action (v4.2.5 → v4.3.0) ([#6](https://github.com/woodleighschool/snipe-sync/issues/6)) ([9345f11](https://github.com/woodleighschool/snipe-sync/commit/9345f114618de32ae5f79b14bef82ac775ef346a))
+* validate release archives and skip metadata checks ([37fb62e](https://github.com/woodleighschool/snipe-sync/commit/37fb62eab758d41e2fdf35f7e3d6e2ce1d11bbb9))
+
+
+### Miscellaneous Chores
+
+* fresh mise lock ([2078876](https://github.com/woodleighschool/snipe-sync/commit/2078876ffee32f21ed6855b5c711b6dd7ce79956))
+* **mise:** update go toolchain ([#10](https://github.com/woodleighschool/snipe-sync/issues/10)) ([6fb1f1e](https://github.com/woodleighschool/snipe-sync/commit/6fb1f1e688feb7ea5480d9774192f9d497947764))
+* **mise:** update tool lefthook (2.1.11 → 2.1.12) ([#11](https://github.com/woodleighschool/snipe-sync/issues/11)) ([abd691e](https://github.com/woodleighschool/snipe-sync/commit/abd691ee43ee655aa13311eedfe4967e36e6dbb1))
+* **mise:** update tool oxfmt (0.65.0 → 0.66.0) ([#16](https://github.com/woodleighschool/snipe-sync/issues/16)) ([6592ab2](https://github.com/woodleighschool/snipe-sync/commit/6592ab2e573e3c4c9370c70eeac4587d03833498))
+* **mise:** update tool zizmor (1.29.0 → 1.30.0) ([#15](https://github.com/woodleighschool/snipe-sync/issues/15)) ([6b7c2d6](https://github.com/woodleighschool/snipe-sync/commit/6b7c2d6510125d22a1377dba4c6207195a57bb81))
+* remove redundant workflow lint task ([1cca374](https://github.com/woodleighschool/snipe-sync/commit/1cca3743f920a69c502c79c02eafa6391c93c5a0))
+
 ## [1.1.0](https://github.com/woodleighschool/snipe-sync/compare/1.0.0...1.1.0) (2026-08-27)
 
 

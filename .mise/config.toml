@@ -1,11 +1,11 @@
 [tools]
 go = "1.27.1"
-"go:golang.org/x/vuln/cmd/govulncheck" = "1.7.0"
+"go:golang.org/x/vuln/cmd/govulncheck" = "v1.8.0"
 golangci-lint = "2.13.2"
 lefthook = "2.1.12"
 actionlint = "1.7.12"
-zizmor = "1.30.0"
-oxfmt = "0.66.0"
+zizmor = "1.30.1"
+oxfmt = "0.67.0"
 "npm:@commitlint/cli" = "21.2.2"
 
 [settings]

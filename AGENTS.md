@@ -36,7 +36,7 @@ Guidance for agents and humans working in this repository. This file is self-con
 - Put executable composition in `cmd/<app>/main.go` and owned behaviour under `internal`. Keep `main` to configuration, logging, dependency construction, lifecycle, and exit status.
 - Use `github.com/caarlos0/env/v11` for application-owned environment configuration. Parse into one config type, derive and validate in one load boundary, and fail at startup. Document config fields with their purpose and meaningful defaults.
 - Use `github.com/spf13/pflag` for application-owned flags and Cobra when the CLI has commands or more than a small flag surface. Structured files suit user-authored domain configuration; all sources converge on one validation path.
-- Use `log/slog` and structured stdout logging. Configure logging once at composition; use package-level logging or inject `*slog.Logger` at a genuine reusable boundary.
+- Use `log/slog` for diagnostics, configured once at composition. Reserve stdout for command reports and send diagnostics to stderr. Inject `*slog.Logger` at a genuine reusable boundary.
 - Wrap errors with `fmt.Errorf("<component>: %w", err)`. Use sentinel errors for conditions callers branch on and classify errors once at the HTTP, CLI, job, or protocol boundary.
 - Functions that perform I/O take `context.Context` first and propagate cancellation. Long-running processes use signal-aware root contexts and bounded shutdown; use `errgroup` for related goroutines that can fail.
 - Prefer standard-library tests and table-driven subtests when a table makes cases clearer. Keep the package's established test framework, use local servers or fakes at real boundaries, and run race-enabled tests for concurrent code.

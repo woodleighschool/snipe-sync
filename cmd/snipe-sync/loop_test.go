@@ -39,7 +39,8 @@ func TestRunLoopCancelsInFlightReconciliation(t *testing.T) {
 }
 
 func TestRunCycleKeepsRoutineDecisionsAtDebug(t *testing.T) {
-	result := app.Result{Plan: outputFixture(), Apply: &app.ApplyResult{UsersApplied: 1, AssetsApplied: 1}}
+	plan := outputFixture()
+	result := app.Result{Plan: &plan, Apply: &app.ApplyResult{UsersApplied: 1, AssetsApplied: 1}}
 	service := staticReconciler{result: result}
 
 	var infoOutput bytes.Buffer
@@ -79,7 +80,8 @@ func TestRunCycleKeepsRoutineDecisionsAtDebug(t *testing.T) {
 }
 
 func TestRunCycleDoesNotReportUnknownOutcomesAsApplied(t *testing.T) {
-	result := app.Result{Plan: outputFixture(), Apply: &app.ApplyResult{}}
+	plan := outputFixture()
+	result := app.Result{Plan: &plan, Apply: &app.ApplyResult{}}
 	service := staticReconciler{result: result, err: context.Canceled}
 	var output bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&output, &slog.HandlerOptions{Level: slog.LevelInfo}))

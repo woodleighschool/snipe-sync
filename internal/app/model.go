@@ -57,6 +57,6 @@ type ApplyResult struct {
 
 // Result combines a complete plan with the outcome of applying it.
 type Result struct {
-	Plan  planner.Plan `json:"plan"`
-	Apply *ApplyResult `json:"apply,omitempty"`
+	Plan  *planner.Plan `json:"plan,omitempty"`
+	Apply *ApplyResult  `json:"apply,omitempty"`
 }

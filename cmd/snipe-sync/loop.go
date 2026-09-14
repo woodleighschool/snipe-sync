@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"time"
 
@@ -41,20 +40,17 @@ func runCycle(ctx context.Context, service reconciler, logger *slog.Logger) erro
 	if ctx.Err() != nil {
 		return err
 	}
-	if result.Apply != nil {
-		logReconciliation(logger, result, err)
-	}
-	userCounts := result.Plan.UserCounts()
-	assetCounts := result.Plan.AssetCounts()
-	attributes := []any{
-		"users", len(result.Plan.Users),
-		"users_create", userCounts[planner.UserCreate],
-		"users_update", userCounts[planner.UserUpdate],
-		"users_disable", userCounts[planner.UserDisable],
-		"assets", len(result.Plan.Assets),
-		"assets_change", assetCounts[planner.AssetChange],
-		"assets_skipped", assetCounts[planner.AssetSkipped],
-		"duration", time.Since(started),
+	attributes := []any{"duration", time.Since(started)}
+	if result.Plan != nil {
+		logEvaluations(logger, *result.Plan)
+		userCounts := result.Plan.UserCounts()
+		assetCounts := result.Plan.AssetCounts()
+		attributes = append(attributes,
+			"users", len(result.Plan.Users), "users_create", userCounts[planner.UserCreate],
+			"users_update", userCounts[planner.UserUpdate], "users_disable", userCounts[planner.UserDisable],
+			"assets", len(result.Plan.Assets), "assets_change", assetCounts[planner.AssetChange],
+			"assets_skipped", assetCounts[planner.AssetSkipped],
+		)
 	}
 	if result.Apply != nil {
 		attributes = append(attributes,
@@ -71,48 +67,15 @@ func runCycle(ctx context.Context, service reconciler, logger *slog.Logger) erro
 	return err
 }
 
-func logReconciliation(logger *slog.Logger, result app.Result, reconcileErr error) {
-	for _, warning := range result.Plan.Warnings {
-		logger.Warn("reconciliation warning", "warning", warning)
-	}
-	failures := make(map[string]string, len(result.Apply.Failures))
-	for _, failure := range result.Apply.Failures {
-		failures[failure.Kind+"\x00"+failure.Identifier] = failure.Error
-	}
-	interrupted := errors.Is(reconcileErr, context.Canceled) || errors.Is(reconcileErr, context.DeadlineExceeded)
-	for _, user := range result.Plan.Users {
-		attributes := []any{"email", user.Email, "action", user.Action}
-		failure := failures["user\x00"+user.Email]
-		switch {
-		case failure != "":
-			logger.Warn("user reconciliation failed", append(attributes, "error", failure)...)
-		case user.Action == planner.UserNoop:
-			logger.Debug("user evaluated", attributes...)
-		case interrupted:
-			logger.Debug("user outcome unavailable", attributes...)
-		default:
-			logger.Info("user reconciled", attributes...)
+func logEvaluations(logger *slog.Logger, plan planner.Plan) {
+	for _, user := range plan.Users {
+		if user.Action == planner.UserNoop {
+			logger.Debug("user evaluated", "email", user.Email, "action", user.Action)
 		}
 	}
-	for _, asset := range result.Plan.Assets {
-		attributes := []any{
-			"source", asset.Source,
-			"serial", asset.SerialNumber,
-			"result", asset.Result,
-			"decision", assetResult(asset),
-		}
-		failure := failures["asset\x00"+asset.SerialNumber]
-		switch {
-		case failure != "":
-			logger.Warn("asset reconciliation failed", append(attributes, "error", failure)...)
-		case asset.Result == planner.AssetChange:
-			if interrupted {
-				logger.Debug("asset outcome unavailable", attributes...)
-			} else {
-				logger.Info("asset reconciled", attributes...)
-			}
-		default:
-			logger.Debug("asset evaluated", attributes...)
+	for _, asset := range plan.Assets {
+		if asset.Result != planner.AssetChange {
+			logger.Debug("asset evaluated", "source", asset.Source, "serial", asset.SerialNumber, "result", asset.Result, "decision", assetResult(asset))
 		}
 	}
 }

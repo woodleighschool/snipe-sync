@@ -27,29 +27,29 @@ touch .env
 
 Fill `.env` with values for the `${...}` names in `config.yaml`. The container commands below read this file; export the same values in your shell when using a downloaded binary.
 
-| Command                 | Behaviour                                    |
-| ----------------------- | -------------------------------------------- |
-| `snipe-sync validate`   | Validate configuration and exit              |
-| `snipe-sync plan`       | Print a read-only reconciliation plan        |
-| `snipe-sync run --once` | Apply one reconciliation cycle and exit      |
-| `snipe-sync run`        | Apply immediately, then continue on interval |
+| Command               | Behaviour                                    |
+| --------------------- | -------------------------------------------- |
+| `snipe-sync validate` | Validate configuration and exit              |
+| `snipe-sync plan`     | Print a read-only reconciliation plan        |
+| `snipe-sync apply`    | Apply one reconciliation cycle and exit      |
+| `snipe-sync run`      | Apply immediately, then continue on interval |
 
 If `config.yaml` is in the current directory, `--config` may be omitted. Multiple `--config` flags apply overlays in order.
 
 ### Run once
 
 ```bash
-snipe-sync run --once
+snipe-sync apply
 ```
 
-The container already selects `run`, so pass only `--once`:
+With the container:
 
 ```bash
 docker run --rm \
   --env-file .env \
   --volume "$PWD/config.yaml:/config.yaml:ro" \
   ghcr.io/woodleighschool/snipe-sync:rolling \
-  --once
+  apply
 ```
 
 ### Run continuously
@@ -67,13 +67,26 @@ docker run --rm \
   ghcr.io/woodleighschool/snipe-sync:rolling
 ```
 
-Daemon mode writes structured JSON to stderr. Lifecycle and material reconciliation events use `info`, warnings and failures use `warn` or `error`, and successful cycle summaries plus routine no-op evaluations use `debug`.
+Stages and diagnostics go to stderr; reports go to stdout. Finite commands show
+indented operation rows beneath a reconciliation heading, with measured counts where available and a spinner for
+waiting work. Completed results remain in scrollback. Colours respect `NO_COLOR`.
+Successful operation trees collapse to their heading; failures remain expanded.
+Redirected output and CI use log lines, with intermediate progress at debug level. `--no-progress` disables animation. `--quiet` (`-q`) keeps warnings and errors;
+`--verbose` (`-v`) and `--debug` (`-d`) enable debug diagnostics. Use `--log-level
+debug|info|warn|error` for an explicit threshold. Log levels leave reports intact.
+`--output text` (default) writes a readable report. `--output json` writes one report object, including partial results and an `error`
+when execution fails. `--log-format json` writes JSON diagnostic records.
+
+`run` defaults to JSON diagnostics with no animation. Startup, shutdown and
+material changes use `info`; routine stages and unchanged cycles use `debug`.
+`--log-format text` selects readable service logs. Cycles continue after failures;
+`apply` exits unsuccessfully when its cycle fails.
 
 ## ⚙️ Configuration
 
 Configuration is strict and versioned. Unknown fields, missing references, ambiguous Snipe metadata, unset environment placeholders, and invalid CEL expressions fail before reconciliation. Mappings merge recursively; lists and scalar values replace earlier values. Environment placeholders must occupy the whole value, such as `${SNIPEIT_API_KEY}`.
 
-Runtime settings resolve from `SNIPE_SYNC_*` environment variables, then the corresponding YAML value, then the default. CLI flags select configuration files or command behaviour rather than mirroring runtime settings.
+Runtime settings resolve from `SNIPE_SYNC_*` environment variables, then the corresponding YAML value, then the default. Explicit CLI logging flags override the configured log level.
 
 | Environment variable                 | YAML fallback             | Default |
 | ------------------------------------ | ------------------------- | ------- |

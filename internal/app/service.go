@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -16,6 +18,7 @@ import (
 
 // Service reconciles complete provider snapshots through one deterministic plan.
 type Service struct {
+	logger   *slog.Logger
 	config   *config.Config
 	identity IdentitySource
 	sources  []DeviceSource
@@ -24,7 +27,7 @@ type Service struct {
 }
 
 // New creates a reconciliation service.
-func New(cfg *config.Config, identity IdentitySource, sources []DeviceSource, target Target) (*Service, error) {
+func New(cfg *config.Config, identity IdentitySource, sources []DeviceSource, target Target, logger *slog.Logger) (*Service, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("config is required")
 	}
@@ -48,7 +51,11 @@ func New(cfg *config.Config, identity IdentitySource, sources []DeviceSource, ta
 	if err != nil {
 		return nil, fmt.Errorf("load target timezone: %w", err)
 	}
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
 	return &Service{
+		logger: logger,
 		config: cfg, identity: identity, sources: append([]DeviceSource(nil), sources...),
 		target: target, timezone: timezone,
 	}, nil
@@ -60,7 +67,10 @@ func (s *Service) Reconcile(ctx context.Context, apply bool) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	result := Result{Plan: plan}
+	for _, warning := range plan.Warnings {
+		s.logger.WarnContext(ctx, "reconciliation warning", "warning", warning)
+	}
+	result := Result{Plan: &plan}
 	if !apply {
 		return result, nil
 	}
@@ -69,7 +79,9 @@ func (s *Service) Reconcile(ctx context.Context, apply bool) (Result, error) {
 	return result, err
 }
 
-func (s *Service) plan(ctx context.Context) (planner.Plan, *TargetSnapshot, error) {
+func (s *Service) plan(ctx context.Context) (result planner.Plan, snapshot *TargetSnapshot, runErr error) {
+	done := s.stage(ctx, "Fetching provider snapshots")
+	defer func() { done(runErr) }()
 	type sourceResult struct {
 		name    string
 		devices []domain.Device
@@ -83,6 +95,7 @@ func (s *Service) plan(ctx context.Context) (planner.Plan, *TargetSnapshot, erro
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.Go(func() error {
 		var err error
+		s.logger.DebugContext(groupCtx, "Fetching directory users")
 		users, warnings, err = s.identity.ListUsers(groupCtx)
 		if err != nil {
 			return fmt.Errorf("list identity users: %w", err)
@@ -91,6 +104,7 @@ func (s *Service) plan(ctx context.Context) (planner.Plan, *TargetSnapshot, erro
 	})
 	group.Go(func() error {
 		var err error
+		s.logger.DebugContext(groupCtx, "Fetching Snipe inventory")
 		targetSnapshot, err = s.target.Snapshot(groupCtx, s.config.Assets.ManagedByField)
 		if err != nil {
 			return fmt.Errorf("read Snipe snapshot: %w", err)
@@ -99,6 +113,7 @@ func (s *Service) plan(ctx context.Context) (planner.Plan, *TargetSnapshot, erro
 	})
 	for index, source := range s.sources {
 		group.Go(func() error {
+			s.logger.DebugContext(groupCtx, "Fetching devices", "source", source.Name())
 			listed, err := source.ListDevices(groupCtx)
 			if err != nil {
 				return fmt.Errorf("list %s devices: %w", source.Name(), err)
@@ -107,13 +122,16 @@ func (s *Service) plan(ctx context.Context) (planner.Plan, *TargetSnapshot, erro
 			return nil
 		})
 	}
-	if err := group.Wait(); err != nil {
+	err := group.Wait()
+	done(err)
+	if err != nil {
 		return planner.Plan{}, nil, err
 	}
 	devices := make(map[string][]domain.Device, len(sourceResults))
 	for _, result := range sourceResults {
 		devices[result.name] = result.devices
 	}
+	done = s.stage(ctx, "Planning users and assets")
 	engine, err := planner.New(s.config, planner.Metadata{
 		Departments: targetSnapshot.Departments, Locations: targetSnapshot.Locations,
 		Statuses: targetSnapshot.Statuses, Manufacturers: targetSnapshot.Manufacturers,
@@ -131,13 +149,21 @@ func (s *Service) plan(ctx context.Context) (planner.Plan, *TargetSnapshot, erro
 	return plan, targetSnapshot, nil
 }
 
-func (s *Service) apply(ctx context.Context, plan planner.Plan, snapshot *TargetSnapshot) (ApplyResult, error) {
-	result := ApplyResult{}
+func (s *Service) apply(ctx context.Context, plan planner.Plan, snapshot *TargetSnapshot) (result ApplyResult, runErr error) {
 	userIDs := make(map[string]int64, len(snapshot.Users))
 	for email, user := range snapshot.Users {
 		userIDs[email] = user.ID
 	}
+	total, completed := 0, 0
+	for _, user := range plan.Users {
+		if user.Action == planner.UserCreate || user.Action == planner.UserUpdate || user.Action == planner.UserDisable {
+			total++
+		}
+	}
+	done := s.stage(ctx, "Applying users", "total", total, "unit", "attempts")
+	defer func() { done(runErr) }()
 	var failures []error
+	failureStart := 0
 	for _, action := range []planner.UserAction{planner.UserCreate, planner.UserUpdate, planner.UserDisable} {
 		for _, user := range plan.Users {
 			if user.Action != action {
@@ -156,11 +182,14 @@ func (s *Service) apply(ctx context.Context, plan planner.Plan, snapshot *Target
 			} else {
 				err = s.target.PatchUser(ctx, user.TargetID, user.Patch)
 			}
+			completed++
+			s.logger.InfoContext(ctx, "Applying users", "progress", true, "current", completed, "total", total, "unit", "attempts", "progress_final", completed == total)
 			if err != nil {
-				failures = append(failures, s.recordFailure(&result, "user", user.Email, err))
+				failures = append(failures, s.recordFailure(ctx, &result, "user", user.Email, err))
 				continue
 			}
 			result.UsersApplied++
+			s.logger.InfoContext(ctx, "user reconciled", "email", user.Email, "action", user.Action)
 		}
 	}
 	type assetApplyState struct {
@@ -183,6 +212,9 @@ func (s *Service) apply(ctx context.Context, plan planner.Plan, snapshot *Target
 		}
 		assets = append(assets, state)
 	}
+	done(errors.Join(failures[failureStart:]...))
+	failureStart = len(failures)
+	done = s.stage(ctx, "Updating assets", "total", len(assets), "unit", "assets")
 	for index := range assets {
 		state := &assets[index]
 		if err := ctx.Err(); err != nil {
@@ -191,18 +223,32 @@ func (s *Service) apply(ctx context.Context, plan planner.Plan, snapshot *Target
 		if !state.plan.Patch.Empty() {
 			if err := s.target.PatchAsset(ctx, state.plan.AssetID, state.plan.Patch, snapshot.ManagedByColumn); err != nil {
 				state.failed = true
-				failures = append(failures, s.recordFailure(
+				failures = append(failures, s.recordFailure(ctx,
 					&result, "asset", state.plan.SerialNumber, fmt.Errorf("patch: %w", err),
 				))
 			}
 		}
+		s.logger.InfoContext(ctx, "Updating assets", "progress", true, "current", index+1, "total", len(assets), "unit", "assets", "progress_final", index+1 == len(assets))
 		if !state.failed && state.assignmentErr != nil {
 			state.failed = true
-			failures = append(failures, s.recordFailure(
+			failures = append(failures, s.recordFailure(ctx,
 				&result, "asset", state.plan.SerialNumber, state.assignmentErr,
 			))
 		}
+		if !state.failed && !state.plan.Checkin && state.plan.CheckoutUser == "" {
+			result.AssetsApplied++
+			s.logger.InfoContext(ctx, "asset reconciled", "source", state.plan.Source, "serial", state.plan.SerialNumber)
+		}
 	}
+	total, completed = 0, 0
+	for _, state := range assets {
+		if !state.failed && state.plan.Checkin {
+			total++
+		}
+	}
+	done(errors.Join(failures[failureStart:]...))
+	failureStart = len(failures)
+	done = s.stage(ctx, "Checking in assets", "total", total, "unit", "attempts")
 	for index := range assets {
 		state := &assets[index]
 		if state.failed || !state.plan.Checkin {
@@ -213,11 +259,26 @@ func (s *Service) apply(ctx context.Context, plan planner.Plan, snapshot *Target
 		}
 		if err := s.target.CheckinAsset(ctx, state.plan.AssetID); err != nil {
 			state.failed = true
-			failures = append(failures, s.recordFailure(
+			failures = append(failures, s.recordFailure(ctx,
 				&result, "asset", state.plan.SerialNumber, fmt.Errorf("check in: %w", err),
 			))
 		}
+		completed++
+		s.logger.InfoContext(ctx, "Checking in assets", "progress", true, "current", completed, "total", total, "unit", "attempts", "progress_final", completed == total)
+		if !state.failed && state.plan.CheckoutUser == "" {
+			result.AssetsApplied++
+			s.logger.InfoContext(ctx, "asset reconciled", "source", state.plan.Source, "serial", state.plan.SerialNumber)
+		}
 	}
+	total, completed = 0, 0
+	for _, state := range assets {
+		if !state.failed && state.plan.CheckoutUser != "" {
+			total++
+		}
+	}
+	done(errors.Join(failures[failureStart:]...))
+	failureStart = len(failures)
+	done = s.stage(ctx, "Checking out assets", "total", total, "unit", "attempts")
 	for index := range assets {
 		state := &assets[index]
 		if state.failed || state.plan.CheckoutUser == "" {
@@ -230,20 +291,38 @@ func (s *Service) apply(ctx context.Context, plan planner.Plan, snapshot *Target
 			ctx, state.plan.AssetID, state.checkoutUserID, state.plan.CheckoutAt, s.timezone,
 		); err != nil {
 			state.failed = true
-			failures = append(failures, s.recordFailure(
+			failures = append(failures, s.recordFailure(ctx,
 				&result, "asset", state.plan.SerialNumber, fmt.Errorf("check out: %w", err),
 			))
 		}
-	}
-	for _, state := range assets {
+		completed++
+		s.logger.InfoContext(ctx, "Checking out assets", "progress", true, "current", completed, "total", total, "unit", "attempts", "progress_final", completed == total)
 		if !state.failed {
 			result.AssetsApplied++
+			s.logger.InfoContext(ctx, "asset reconciled", "source", state.plan.Source, "serial", state.plan.SerialNumber)
 		}
 	}
+	done(errors.Join(failures[failureStart:]...))
 	return result, errors.Join(failures...)
 }
 
-func (*Service) recordFailure(result *ApplyResult, kind, identifier string, err error) error {
+func (s *Service) recordFailure(ctx context.Context, result *ApplyResult, kind, identifier string, err error) error {
+	s.logger.WarnContext(ctx, "reconciliation failed", "kind", kind, "identifier", identifier, "error", err)
 	result.Failures = append(result.Failures, Failure{Kind: kind, Identifier: identifier, Error: err.Error()})
 	return fmt.Errorf("%s %s: %w", kind, identifier, err)
+}
+
+func (s *Service) stage(ctx context.Context, message string, attrs ...any) func(error) {
+	started := time.Now()
+	s.logger.InfoContext(ctx, message, append([]any{"stage", true}, attrs...)...)
+	var once sync.Once
+	return func(err error) {
+		once.Do(func() {
+			result := append([]any{"stage_result", true, "elapsed", time.Since(started).Round(time.Millisecond)}, attrs...)
+			if err != nil {
+				result = append(result, "error", err)
+			}
+			s.logger.InfoContext(ctx, message, result...)
+		})
+	}
 }

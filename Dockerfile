@@ -33,4 +33,5 @@ FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/snipe-sync /snipe-sync
 USER 65532:65532
-ENTRYPOINT ["/snipe-sync", "run"]
+ENTRYPOINT ["/snipe-sync"]
+CMD ["run"]

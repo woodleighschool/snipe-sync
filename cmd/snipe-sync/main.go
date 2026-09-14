@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"os"
 	"os/signal"
 	"syscall"
@@ -21,8 +21,13 @@ func main() {
 func run() int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	if err := newRootCommand().ExecuteContext(ctx); err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, err)
+	command, output := newRootCommand()
+	executed, err := command.ExecuteContextC(ctx)
+	output.finish(executed, err)
+	if errors.Is(err, context.Canceled) {
+		return 130
+	}
+	if err != nil {
 		return 1
 	}
 	return 0

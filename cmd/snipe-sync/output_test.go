@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/woodleighschool/snipe-sync/internal/app"
 	"github.com/woodleighschool/snipe-sync/internal/domain"
 	"github.com/woodleighschool/snipe-sync/internal/planner"
 )
@@ -14,14 +15,14 @@ func TestWriteJSONPlanProducesOneCompleteObject(t *testing.T) {
 	plan := outputFixture()
 	for _, all := range []bool{false, true} {
 		var output bytes.Buffer
-		if err := writePlan(&output, "json", all, plan); err != nil {
+		if err := writeReport(&output, "json", all, app.Result{Plan: &plan}, nil); err != nil {
 			t.Fatal(err)
 		}
-		var decoded planner.Plan
+		var decoded reconciliationReport
 		if err := json.Unmarshal(output.Bytes(), &decoded); err != nil {
 			t.Fatal(err)
 		}
-		if len(decoded.Users) != 1 || len(decoded.Assets) != 4 {
+		if len(decoded.Plan.Users) != 1 || len(decoded.Plan.Assets) != 4 {
 			t.Errorf("all %t: decoded plan = %#v", all, decoded)
 		}
 	}
@@ -29,7 +30,8 @@ func TestWriteJSONPlanProducesOneCompleteObject(t *testing.T) {
 
 func TestWriteHumanPlanShowsChangesAndSkippedAssets(t *testing.T) {
 	var output bytes.Buffer
-	if err := writePlan(&output, "human", false, outputFixture()); err != nil {
+	plan := outputFixture()
+	if err := writeReport(&output, "text", false, app.Result{Plan: &plan}, nil); err != nil {
 		t.Fatal(err)
 	}
 	text := output.String()
@@ -55,7 +57,8 @@ func TestWriteHumanPlanShowsChangesAndSkippedAssets(t *testing.T) {
 
 func TestWriteHumanPlanAllIncludesUnchangedAssets(t *testing.T) {
 	var output bytes.Buffer
-	if err := writePlan(&output, "human", true, outputFixture()); err != nil {
+	plan := outputFixture()
+	if err := writeReport(&output, "text", true, app.Result{Plan: &plan}, nil); err != nil {
 		t.Fatal(err)
 	}
 	text := output.String()

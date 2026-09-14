@@ -1,12 +1,16 @@
 package app
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -97,6 +101,8 @@ func TestApplyUsesGlobalAssetPhases(t *testing.T) {
 		},
 	}}
 
+	var logs bytes.Buffer
+	service.logger = slog.New(slog.NewJSONHandler(&logs, nil))
 	result, err := service.apply(context.Background(), plan, target.snapshot)
 	if err != nil {
 		t.Fatal(err)
@@ -111,6 +117,28 @@ func TestApplyUsesGlobalAssetPhases(t *testing.T) {
 	}
 	if !reflect.DeepEqual(target.calls, want) {
 		t.Errorf("target calls = %#v, want %#v", target.calls, want)
+	}
+
+	completed := map[string]int{}
+	decoder := json.NewDecoder(&logs)
+	for decoder.More() {
+		var record struct {
+			Message        string `json:"msg"`
+			Progress       bool
+			Current, Total int
+			Final          bool `json:"progress_final"`
+		}
+		if err := decoder.Decode(&record); err != nil {
+			t.Fatal(err)
+		}
+		if record.Progress && record.Final {
+			completed[record.Message] = record.Current
+		}
+	}
+	for _, phase := range []string{"Updating assets", "Checking in assets", "Checking out assets"} {
+		if completed[phase] != 2 {
+			t.Fatalf("%s completed: %v", phase, completed)
+		}
 	}
 }
 
@@ -152,13 +180,48 @@ func TestIncompleteSourcePreventsAllWrites(t *testing.T) {
 		name: "primary", err: errors.New("inventory unavailable"),
 	}}, target)
 
-	_, err := service.Reconcile(context.Background(), true)
+	result, err := service.Reconcile(context.Background(), true)
 	if err == nil {
 		t.Fatal("Reconcile error = nil, want source failure")
 	}
 	if len(target.calls) != 0 {
 		t.Errorf("target writes = %#v, want none", target.calls)
 	}
+	if result.Plan != nil || result.Apply != nil {
+		t.Fatalf("incomplete inventory produced a result: %#v", result)
+	}
+}
+
+func TestInterruptedApplyRetainsCompletedAssets(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	target := &cancellingTarget{fakeTarget: fixtureTarget(), cancel: cancel}
+	service := newTestService(t, &fakeIdentity{}, []DeviceSource{&fakeSource{name: "primary"}}, target)
+	var diagnostics bytes.Buffer
+	service.logger = slog.New(slog.NewJSONHandler(&diagnostics, nil))
+	name := "Updated"
+	plan := planner.Plan{Assets: []planner.AssetPlan{
+		{Result: planner.AssetChange, AssetID: 1, SerialNumber: "SERIAL-1", Patch: domain.AssetPatch{Name: &name}},
+		{Result: planner.AssetChange, AssetID: 2, SerialNumber: "SERIAL-2", Checkin: true},
+	}}
+	result, err := service.apply(ctx, plan, target.snapshot)
+	if !errors.Is(err, context.Canceled) || result.AssetsApplied != 1 {
+		t.Fatalf("result = %#v, error = %v", result, err)
+	}
+	if !strings.Contains(diagnostics.String(), `"current":1,"total":2`) || strings.Contains(diagnostics.String(), `"current":2,"total":2`) || !strings.Contains(diagnostics.String(), `"serial":"SERIAL-1"`) || strings.Contains(diagnostics.String(), `"serial":"SERIAL-2"`) {
+		t.Fatalf("completion logs = %s", diagnostics.String())
+	}
+}
+
+type cancellingTarget struct {
+	*fakeTarget
+	cancel context.CancelFunc
+}
+
+func (f *cancellingTarget) PatchAsset(ctx context.Context, id int64, patch domain.AssetPatch, field string) error {
+	err := f.fakeTarget.PatchAsset(ctx, id, patch, field)
+	f.cancel()
+	return err
 }
 
 type fakeIdentity struct {
@@ -239,7 +302,7 @@ func newTestService(t *testing.T, identity IdentitySource, sources []DeviceSourc
 	if err != nil {
 		t.Fatal(err)
 	}
-	service, err := New(cfg, identity, sources, target)
+	service, err := New(cfg, identity, sources, target, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

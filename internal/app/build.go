@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"maps"
 	"sort"
 	"strings"
@@ -20,7 +21,7 @@ import (
 )
 
 // Build creates provider clients and a service from validated configuration.
-func Build(cfg *config.Config) (*Service, error) {
+func Build(cfg *config.Config, logger *slog.Logger) (*Service, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("config is required")
 	}
@@ -85,7 +86,7 @@ func Build(cfg *config.Config) (*Service, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create Snipe connection %q: %w", cfg.Target.Connection, err)
 	}
-	return New(cfg, identity, sources, &snipeTarget{client: targetClient})
+	return New(cfg, identity, sources, &snipeTarget{client: targetClient}, logger)
 }
 
 type entraClient interface {

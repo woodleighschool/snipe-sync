@@ -30,7 +30,7 @@ func TestValidateLoadsOrderedConfigurationFiles(t *testing.T) {
     - when: device.serial_number == "FIELD-SKIP"
       fields: [name]
 `)
-	command := newRootCommand()
+	command, _ := newRootCommand()
 	command.SetArgs([]string{"validate", "--config", basePath, "--config", overlayPath})
 	var output bytes.Buffer
 	command.SetOut(&output)

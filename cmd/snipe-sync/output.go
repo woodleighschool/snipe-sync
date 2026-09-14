@@ -7,19 +7,50 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/woodleighschool/snipe-sync/internal/app"
 	"github.com/woodleighschool/snipe-sync/internal/planner"
 )
 
-func writePlan(writer io.Writer, output string, includeUnchanged bool, plan planner.Plan) error {
+type reconciliationReport struct {
+	app.Result
+	Error string `json:"error,omitempty"`
+}
+
+func writeReport(writer io.Writer, output string, includeUnchanged bool, result app.Result, runErr error) error {
+	report := reconciliationReport{Result: result}
+	if runErr != nil {
+		report.Error = runErr.Error()
+	}
 	if output == "json" {
 		encoder := json.NewEncoder(writer)
 		encoder.SetEscapeHTML(false)
-		if err := encoder.Encode(plan); err != nil {
-			return fmt.Errorf("write JSON plan: %w", err)
+		return encoder.Encode(report)
+	}
+	if result.Plan == nil {
+		_, err := fmt.Fprintln(writer, "No reconciliation plan available.")
+		return err
+	}
+	if result.Apply != nil {
+		if _, err := fmt.Fprintln(writer, "Planned changes"); err != nil {
+			return err
 		}
+	}
+	if err := writeHumanPlan(writer, includeUnchanged, *result.Plan); err != nil {
+		return err
+	}
+	if result.Apply == nil {
 		return nil
 	}
-	return writeHumanPlan(writer, includeUnchanged, plan)
+	if _, err := fmt.Fprintf(writer, "Applied: %d users, %d assets; %d failures\n",
+		result.Apply.UsersApplied, result.Apply.AssetsApplied, len(result.Apply.Failures)); err != nil {
+		return err
+	}
+	for _, failure := range result.Apply.Failures {
+		if _, err := fmt.Fprintf(writer, "Failed %s %s: %s\n", failure.Kind, failure.Identifier, failure.Error); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func writeHumanPlan(writer io.Writer, includeUnchanged bool, plan planner.Plan) error {

@@ -1,8 +1,8 @@
 package main
 
 import (
+	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -11,7 +11,7 @@ import (
 	"github.com/woodleighschool/snipe-sync/internal/config"
 )
 
-func newRootCommand() *cobra.Command {
+func newRootCommand() (*cobra.Command, *commandOutput) {
 	var configPaths []string
 	command := &cobra.Command{
 		Use:           "snipe-sync",
@@ -24,6 +24,10 @@ func newRootCommand() *cobra.Command {
 			return command.Help()
 		},
 	}
+	output := newCommandOutput(command)
+	command.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
+		return output.start(cmd)
+	}
 	command.PersistentFlags().StringArrayVar(
 		&configPaths,
 		"config",
@@ -31,13 +35,14 @@ func newRootCommand() *cobra.Command {
 		"path to a YAML configuration file; may be repeated in overlay order",
 	)
 	command.AddCommand(
-		newValidateCommand(&configPaths),
-		newPlanCommand(&configPaths),
-		newRunCommand(&configPaths),
+		newValidateCommand(&configPaths, output),
+		newReconciliationCommand(&configPaths, output, false),
+		newReconciliationCommand(&configPaths, output, true),
+		newRunCommand(&configPaths, output),
 		newSchemaCommand(),
 		newVersionCommand(),
 	)
-	return command
+	return command, output
 }
 
 func defaultConfigPaths() []string {
@@ -48,13 +53,13 @@ func defaultConfigPaths() []string {
 	return []string{"config.yaml"}
 }
 
-func newValidateCommand(configPaths *[]string) *cobra.Command {
+func newValidateCommand(configPaths *[]string, diagnostics *commandOutput) *cobra.Command {
 	return &cobra.Command{
 		Use:   "validate",
 		Short: "Validate configuration and policy expressions",
 		Args:  cobra.NoArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
-			if _, err := config.Load((*configPaths)...); err != nil {
+			if _, err := loadConfig(command, *configPaths, diagnostics); err != nil {
 				return fmt.Errorf("validate configuration: %w", err)
 			}
 			_, err := fmt.Fprintln(command.OutOrStdout(), "configuration valid")
@@ -63,72 +68,58 @@ func newValidateCommand(configPaths *[]string) *cobra.Command {
 	}
 }
 
-func newPlanCommand(configPaths *[]string) *cobra.Command {
+func newReconciliationCommand(configPaths *[]string, diagnostics *commandOutput, apply bool) *cobra.Command {
 	var includeUnchanged bool
 	var output string
+	name, description := "plan", "Fetch complete snapshots and print a read-only reconciliation plan"
+	if apply {
+		name, description = "apply", "Apply one reconciliation cycle and print its result"
+	}
 	command := &cobra.Command{
-		Use:   "plan",
-		Short: "Fetch complete snapshots and print a read-only reconciliation plan",
+		Use:   name,
+		Short: description,
 		Args:  cobra.NoArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
-			if output != "human" && output != "json" {
-				return fmt.Errorf("output must be human or json")
+			if output != "text" && output != "json" {
+				return fmt.Errorf("output must be text or json")
 			}
-			service, err := loadService(*configPaths)
+			cfg, err := loadConfig(command, *configPaths, diagnostics)
 			if err != nil {
 				return err
 			}
-			result, err := service.Reconcile(command.Context(), false)
+			service, err := app.Build(cfg, diagnostics.logger)
 			if err != nil {
-				return err
+				return fmt.Errorf("start service: %w", err)
 			}
-			return writePlan(command.OutOrStdout(), output, includeUnchanged, result.Plan)
+			result, reconcileErr := service.Reconcile(command.Context(), apply)
+			diagnostics.endProgress(reconcileErr)
+			return errors.Join(reconcileErr, writeReport(command.OutOrStdout(), output, includeUnchanged, result, reconcileErr))
 		},
 	}
-	command.Flags().BoolVar(&includeUnchanged, "all", false, "include unchanged devices in human output")
-	command.Flags().StringVar(&output, "output", "human", "plan output format: human or json")
+	command.Flags().BoolVar(&includeUnchanged, "all", false, "Include unchanged devices in human output")
+	command.Flags().StringVar(&output, "output", "text", "Report format: text or json")
 	return command
 }
 
-func newRunCommand(configPaths *[]string) *cobra.Command {
-	var once bool
-	command := &cobra.Command{
+func newRunCommand(configPaths *[]string, diagnostics *commandOutput) *cobra.Command {
+	return &cobra.Command{
 		Use:   "run",
 		Short: "Reconcile immediately, then continue at the configured interval",
 		Args:  cobra.NoArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
-			cfg, service, err := loadConfiguredService(*configPaths)
+			cfg, err := loadConfig(command, *configPaths, diagnostics)
 			if err != nil {
 				return err
 			}
-			logger := slog.New(slog.NewJSONHandler(command.ErrOrStderr(), &slog.HandlerOptions{Level: cfg.ParsedLevel}))
-			logger.Info("service started", "version", version, "config", *configPaths, "once", once)
-			if once {
-				return runCycle(command.Context(), service, logger)
+			service, err := app.Build(cfg, diagnostics.logger)
+			if err != nil {
+				return fmt.Errorf("start service: %w", err)
 			}
-			runLoop(command.Context(), cfg.Reconcile.PollInterval.Duration, service, logger)
+			diagnostics.logger.Info("Service started", "version", version)
+			runLoop(command.Context(), cfg.Reconcile.PollInterval.Duration, service, diagnostics.logger)
 			return nil
 		},
 	}
-	command.Flags().BoolVar(&once, "once", false, "run one reconciliation cycle and exit")
-	return command
-}
-
-func loadService(configPaths []string) (*app.Service, error) {
-	_, service, err := loadConfiguredService(configPaths)
-	return service, err
-}
-
-func loadConfiguredService(configPaths []string) (*config.Config, *app.Service, error) {
-	cfg, err := config.Load(configPaths...)
-	if err != nil {
-		return nil, nil, fmt.Errorf("load configuration: %w", err)
-	}
-	service, err := app.Build(cfg)
-	if err != nil {
-		return nil, nil, fmt.Errorf("start service: %w", err)
-	}
-	return cfg, service, nil
 }
 
 func newSchemaCommand() *cobra.Command {
@@ -152,7 +143,7 @@ func newSchemaCommand() *cobra.Command {
 			return nil
 		},
 	}
-	command.Flags().StringVar(&outputPath, "output", "-", "schema output path, or - for stdout")
+	command.Flags().StringVar(&outputPath, "output-file", "-", "schema output path, or - for stdout")
 	return command
 }
 
@@ -166,4 +157,16 @@ func newVersionCommand() *cobra.Command {
 			return err
 		},
 	}
+}
+
+func loadConfig(command *cobra.Command, paths []string, diagnostics *commandOutput) (*config.Config, error) {
+	cfg, err := config.Load(paths...)
+	if err != nil {
+		return nil, fmt.Errorf("load configuration: %w", err)
+	}
+	if !diagnostics.explicitLevel {
+		diagnostics.threshold.Set(cfg.ParsedLevel)
+	}
+	diagnostics.logger.DebugContext(command.Context(), "Loading application")
+	return cfg, nil
 }

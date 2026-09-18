@@ -1,5 +1,48 @@
 # Changelog
 
+## [2.0.0](https://github.com/woodleighschool/snipe-sync/compare/1.1.0...2.0.0) (2026-09-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* align reconciler commands and output
+
+### Features
+
+* align reconciler commands and output ([4d7d34b](https://github.com/woodleighschool/snipe-sync/commit/4d7d34b41f5d284b4a8a12c40315748e81edc206))
+* **go:** update module github.com/dustin/go-humanize (v1.0.1 → v1.1.0) ([#24](https://github.com/woodleighschool/snipe-sync/issues/24)) ([9328ef9](https://github.com/woodleighschool/snipe-sync/commit/9328ef99c4977fafa2bf2695531cf2a2328d9500))
+* **go:** update module github.com/microsoft/kiota-abstractions-go (v1.10.1 → v1.11.0) ([#23](https://github.com/woodleighschool/snipe-sync/issues/23)) ([28717d5](https://github.com/woodleighschool/snipe-sync/commit/28717d52423e4a257fe96af761f3841e15debe7d))
+* **go:** update module github.com/microsoft/kiota-abstractions-go (v1.9.4 → v1.10.0) ([#9](https://github.com/woodleighschool/snipe-sync/issues/9)) ([3d64523](https://github.com/woodleighschool/snipe-sync/commit/3d64523f253b9d7af2da3e7fa85f6caef673dfe4))
+* **go:** update module github.com/microsoftgraph/msgraph-sdk-go (v1.101.0 → v1.102.0) ([#14](https://github.com/woodleighschool/snipe-sync/issues/14)) ([96bcbcd](https://github.com/woodleighschool/snipe-sync/commit/96bcbcd1c6da59eb700950ba046992c1331a2ca9))
+* **go:** update module github.com/microsoftgraph/msgraph-sdk-go (v1.102.0 → v1.103.0) ([#20](https://github.com/woodleighschool/snipe-sync/issues/20)) ([ad0450d](https://github.com/woodleighschool/snipe-sync/commit/ad0450d87cf5b72160be709926a99423352347e1))
+* **go:** update module golang.org/x/sync (v0.22.0 → v0.23.0) ([#17](https://github.com/woodleighschool/snipe-sync/issues/17)) ([a503914](https://github.com/woodleighschool/snipe-sync/commit/a503914207caf9c6f4893e64ca964801175ea38f))
+
+
+### Bug Fixes
+
+* **container:** update image golang (1.27.0 → 1.27.1) ([#13](https://github.com/woodleighschool/snipe-sync/issues/13)) ([e22669e](https://github.com/woodleighschool/snipe-sync/commit/e22669e3b2b6ad6166fbaa9b78c0cad5e6d6d867))
+* **go:** update module github.com/azure/azure-sdk-for-go/sdk/azidentity (v1.14.0 → v1.14.1) ([#8](https://github.com/woodleighschool/snipe-sync/issues/8)) ([a24e379](https://github.com/woodleighschool/snipe-sync/commit/a24e379b4ff7ee42dee65f14f9142afe6d17ac5e))
+* **go:** update module github.com/microsoft/kiota-abstractions-go (v1.10.0 → v1.10.1) ([#12](https://github.com/woodleighschool/snipe-sync/issues/12)) ([0d6542c](https://github.com/woodleighschool/snipe-sync/commit/0d6542c2369697626ffa464ca46104bf314da4c1))
+
+
+### Continuous Integration
+
+* **github-action:** update action jdx/mise-action (v4.2.5 → v4.3.0) ([#6](https://github.com/woodleighschool/snipe-sync/issues/6)) ([9345f11](https://github.com/woodleighschool/snipe-sync/commit/9345f114618de32ae5f79b14bef82ac775ef346a))
+* validate release archives and skip metadata checks ([37fb62e](https://github.com/woodleighschool/snipe-sync/commit/37fb62eab758d41e2fdf35f7e3d6e2ce1d11bbb9))
+
+
+### Miscellaneous Chores
+
+* fresh mise lock ([2078876](https://github.com/woodleighschool/snipe-sync/commit/2078876ffee32f21ed6855b5c711b6dd7ce79956))
+* **mise:** update go toolchain ([#10](https://github.com/woodleighschool/snipe-sync/issues/10)) ([6fb1f1e](https://github.com/woodleighschool/snipe-sync/commit/6fb1f1e688feb7ea5480d9774192f9d497947764))
+* **mise:** update mise tools ([#18](https://github.com/woodleighschool/snipe-sync/issues/18)) ([04bd1bd](https://github.com/woodleighschool/snipe-sync/commit/04bd1bdee519ed1050f06814919bb997f9212b0f))
+* **mise:** update tool lefthook (2.1.11 → 2.1.12) ([#11](https://github.com/woodleighschool/snipe-sync/issues/11)) ([abd691e](https://github.com/woodleighschool/snipe-sync/commit/abd691ee43ee655aa13311eedfe4967e36e6dbb1))
+* **mise:** update tool lefthook (2.1.12 → 2.1.14) ([#21](https://github.com/woodleighschool/snipe-sync/issues/21)) ([f1b332c](https://github.com/woodleighschool/snipe-sync/commit/f1b332c8b670283f62f9010a70f32d08aa69243d))
+* **mise:** update tool oxfmt (0.65.0 → 0.66.0) ([#16](https://github.com/woodleighschool/snipe-sync/issues/16)) ([6592ab2](https://github.com/woodleighschool/snipe-sync/commit/6592ab2e573e3c4c9370c70eeac4587d03833498))
+* **mise:** update tool oxfmt (0.67.0 → 0.68.0) ([#22](https://github.com/woodleighschool/snipe-sync/issues/22)) ([5c0ba54](https://github.com/woodleighschool/snipe-sync/commit/5c0ba54d50124677bd3725c0cf408089602262ae))
+* **mise:** update tool zizmor (1.29.0 → 1.30.0) ([#15](https://github.com/woodleighschool/snipe-sync/issues/15)) ([6b7c2d6](https://github.com/woodleighschool/snipe-sync/commit/6b7c2d6510125d22a1377dba4c6207195a57bb81))
+* remove redundant workflow lint task ([1cca374](https://github.com/woodleighschool/snipe-sync/commit/1cca3743f920a69c502c79c02eafa6391c93c5a0))
+
 ## [1.1.0](https://github.com/woodleighschool/snipe-sync/compare/1.0.0...1.1.0) (2026-08-27)
 
 

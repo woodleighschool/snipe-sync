@@ -94,9 +94,9 @@ url_api = "https://api.github.com/repos/evilmartians/lefthook/releases/assets/56
 provenance = "github-attestations"
 
 [[tools."npm:@commitlint/cli"]]
-version = "21.2.2"
+version = "21.2.3"
 backend = "npm:@commitlint/cli"
-specifiers = ["21.2.2"]
+specifiers = ["21.2.3"]
 
 [[tools.oxfmt]]
 version = "0.68.0"

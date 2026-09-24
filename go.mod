@@ -76,6 +76,3 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260729162451-8efbd57d26e0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
-
-// Temporary: https://github.com/charmbracelet/bubbletea/pull/1801
-replace charm.land/bubbletea/v2 => github.com/drawmeanelephant/bubbletea/v2 v2.0.10-0.20260911173320-21176428f2e1

@@ -99,9 +99,9 @@ backend = "npm:@commitlint/cli"
 specifiers = ["21.2.3"]
 
 [[tools.oxfmt]]
-version = "0.69.0"
+version = "0.70.0"
 backend = "npm:oxfmt"
-specifiers = ["0.69.0"]
+specifiers = ["0.70.0"]
 
 [[tools.zizmor]]
 version = "1.30.1"

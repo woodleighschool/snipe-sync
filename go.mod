@@ -78,4 +78,4 @@ require (
 )
 
 // Temporary: https://github.com/charmbracelet/bubbletea/pull/1801
-replace charm.land/bubbletea/v2 => github.com/drawmeanelephant/bubbletea/v2 v2.0.10-0.20260911173320-21176428f2e1
+replace charm.land/bubbletea/v2 => github.com/drawmeanelephant/bubbletea/v2 v2.0.9

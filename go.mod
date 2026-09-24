@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	cel.dev/cel-go v0.32.0
 	charm.land/bubbles/v2 v2.2.1
-	charm.land/bubbletea/v2 v2.0.9
+	charm.land/bubbletea/v2 v2.0.10
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.1
 	github.com/caarlos0/env/v11 v11.4.1
 	github.com/dustin/go-humanize v1.1.0

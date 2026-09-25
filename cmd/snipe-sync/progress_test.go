@@ -2,77 +2,109 @@ package main
 
 import (
 	"bytes"
-	"context"
-	"errors"
-	"log/slog"
+	"io"
+	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
-func TestFailedReconciliationRetainsMeasuredResults(t *testing.T) {
-	var rows, logs bytes.Buffer
-	o := &commandOutput{out: &rows, interactive: true}
-	logger := slog.New(&stageHandler{Handler: slog.NewTextHandler(&logs, nil), output: o})
-	logger.Info("Fetching inventory", "stage", true)
-	for current := range 4 {
-		logger.Info("Fetching inventory", "progress", true, "current", current, "total", 3, "unit", "sources")
-	}
-	logger.Info("Fetching inventory", "stage_result", true)
-	logger.Info("Planning changes", "stage", true)
-	logger.Info("Planning changes", "stage_result", true, "error", errors.New("policy failed"))
-	logger.Info("Provider notice")
-	o.endProgress(errors.New("policy failed"))
-	text := rows.String()
-	for _, want := range []string{"✗ Users and assets  failed", "    ✓ Fetching inventory", "3/3 sources 100%", "    ✗ Planning changes"} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("missing %q: %s", want, text)
-		}
-	}
-	if strings.Count(text, "Users and assets") != 1 || strings.Count(text, "Fetching inventory") != 1 || strings.Contains(text, "(0s)") || strings.Contains(text, "·") {
-		t.Fatalf("duplicate or noisy rows: %s", text)
-	}
-	if strings.Contains(logs.String(), "Fetching inventory") || !strings.Contains(logs.String(), "Provider notice") {
-		t.Fatalf("diagnostics: %s", logs.String())
-	}
-}
-
-func TestInterruptedOperationDoesNotClaimSuccess(t *testing.T) {
-	var out bytes.Buffer
-	o := &commandOutput{out: &out, interactive: true}
-	o.progress = newTerminalProgress(&out)
-	o.progress.update(activity{label: "Reading inventory", stage: true})
-	o.progress.update(activity{current: 10, total: -1, unit: "records", progress: true})
-	o.endProgress(context.Canceled)
-	if strings.Contains(out.String(), "%") || !strings.Contains(out.String(), "10 records") || !strings.Contains(out.String(), "interrupted") || strings.Contains(out.String(), "✓") {
-		t.Fatalf("unknown progress: %s", out.String())
-	}
-}
-
-func TestProgressLogVolumeRespectsVerbosity(t *testing.T) {
-	for _, level := range []slog.Level{slog.LevelInfo, slog.LevelDebug} {
-		var out bytes.Buffer
-		o := &commandOutput{out: &out}
-		logger := slog.New(&stageHandler{Handler: slog.NewJSONHandler(&out, &slog.HandlerOptions{Level: level}), output: o})
-		for current := range 10 {
-			logger.Info("Transfer progress", "progress", true, "current", current, "total", 9, "unit", "bytes", "progress_final", current == 9)
-		}
-		want := 1
-		if level == slog.LevelDebug {
-			want = 10
-		}
-		if got := strings.Count(out.String(), "Transfer progress"); got != want {
-			t.Fatalf("level %s: %d logs, want %d", level, got, want)
-		}
-	}
-}
-
-func TestSuccessfulReconciliationCollapses(t *testing.T) {
+func TestProgressShowsOnlyUnfinishedOperations(t *testing.T) {
 	var out bytes.Buffer
 	p := newTerminalProgress(&out)
-	p.update(activity{label: "Planning changes", stage: true})
-	p.update(activity{label: "Planning changes", status: true})
-	p.stop("")
-	if strings.Contains(out.String(), "Planning changes") || strings.Count(strings.TrimSpace(out.String()), "\n") != 0 || !strings.Contains(out.String(), "✓") {
-		t.Fatalf("successful run: %s", out.String())
+	p.update(activity{label: "Reading inventory", stage: true})
+	p.update(activity{label: "Resolving identities", stage: true})
+	if got := p.view(time.Now(), 80, 20); got != "" {
+		t.Fatalf("fast work flashed: %s", got)
+	}
+	p.update(activity{label: "Reading inventory", status: true})
+	p.update(activity{label: "Resolving identities", progress: true, current: 2, total: 4, unit: "identities"})
+	got := p.view(time.Now().Add(time.Second), 80, 20)
+	if strings.Contains(got, "Reading") || !strings.Contains(got, "2 / 4 identities") {
+		t.Fatal(got)
+	}
+	p.update(activity{label: "Resolving identities", status: true})
+	if got := p.view(time.Now().Add(time.Second), 80, 20); got != "" {
+		t.Fatal(got)
+	}
+	p.stop()
+	if out.Len() != 0 {
+		t.Fatalf("completed activity became output: %s", out.String())
+	}
+}
+
+func TestProgressRequiresHumanTerminalOutput(t *testing.T) {
+	terminal, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	if err != nil {
+		t.Skip("requires a controlling terminal")
+	}
+	t.Cleanup(func() { _ = terminal.Close() })
+	t.Setenv("TERM", "xterm")
+	t.Setenv("CI", "")
+	for _, test := range []struct {
+		name, command              string
+		json, stdout, stderr, want bool
+	}{
+		{name: "human", command: "plan", stdout: true, stderr: true, want: true},
+		{name: "json", command: "plan", json: true, stdout: true, stderr: true},
+		{name: "stdout pipe", command: "plan", stderr: true, want: true},
+		{name: "stderr pipe", command: "plan", stdout: true},
+		{name: "both pipes", command: "plan"},
+		{name: "daemon", command: "run", stdout: true, stderr: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root, output := newRootCommand()
+			root.SetOut(io.Discard)
+			root.SetErr(io.Discard)
+			if test.stdout {
+				root.SetOut(terminal)
+			}
+			if test.stderr {
+				root.SetErr(terminal)
+			}
+			command, _, err := root.Find([]string{test.command})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if test.json {
+				if err := command.Flags().Set("json", "true"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := output.start(command); err != nil {
+				t.Fatal(err)
+			}
+			if output.interactive != test.want {
+				t.Fatalf("interactive = %t, want %t", output.interactive, test.want)
+			}
+			output.endProgress()
+		})
+	}
+}
+
+func TestPlainProgressIsSparseAndEndsWithWork(t *testing.T) {
+	var out bytes.Buffer
+	p := newTerminalProgress(&out)
+	p.plain = true
+	p.update(activity{label: "Reading inventory", stage: true})
+	now := time.Now()
+	p.draw(now)
+	if out.Len() != 0 {
+		t.Fatal("fast work printed")
+	}
+	p.draw(now.Add(3 * time.Second))
+	first := out.String()
+	if !strings.Contains(first, "Reading inventory") || strings.Contains(first, "\x1b") {
+		t.Fatalf("milestone: %q", first)
+	}
+	p.draw(now.Add(4 * time.Second))
+	if out.String() != first {
+		t.Fatal("duplicate milestone")
+	}
+	p.update(activity{label: "Reading inventory", status: true})
+	p.draw(now.Add(time.Minute))
+	p.stop()
+	if out.String() != first {
+		t.Fatal("completed work printed")
 	}
 }

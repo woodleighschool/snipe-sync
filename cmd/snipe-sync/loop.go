@@ -47,7 +47,7 @@ func runCycle(ctx context.Context, service reconciler, logger *slog.Logger) erro
 		assetCounts := result.Plan.AssetCounts()
 		attributes = append(attributes,
 			"users", len(result.Plan.Users), "users_create", userCounts[planner.UserCreate],
-			"users_update", userCounts[planner.UserUpdate], "users_disable", userCounts[planner.UserDisable],
+			"users_update", userCounts[planner.UserUpdate], "users_move_department", userCounts[planner.UserMoveDepartment],
 			"assets", len(result.Plan.Assets), "assets_change", assetCounts[planner.AssetChange],
 			"assets_skipped", assetCounts[planner.AssetSkipped],
 		)
@@ -75,7 +75,7 @@ func logEvaluations(logger *slog.Logger, plan planner.Plan) {
 	}
 	for _, asset := range plan.Assets {
 		if asset.Result != planner.AssetChange {
-			logger.Debug("asset evaluated", "source", asset.Source, "serial", asset.SerialNumber, "result", asset.Result, "decision", assetResult(asset))
+			logger.Debug("asset evaluated", "source", asset.Source, "serial", asset.SerialNumber, "result", asset.Result, "skip_reason", asset.SkipReason, "note", asset.Note)
 		}
 	}
 }

@@ -43,17 +43,24 @@ func TestPlannerReconcilesUsersAndPreservesIncompleteLocation(t *testing.T) {
 	if casey.Action != "update" || casey.Patch.Surname == nil || *casey.Patch.Surname != "Changed" {
 		t.Errorf("Casey plan = %#v, want surname update", casey)
 	}
+	if casey.Current == nil || *casey.Current != input.TargetUsers["casey@example.invalid"] {
+		t.Fatalf("user diff lost before values: %#v", casey.Current)
+	}
 	if casey.Patch.LocationID != nil {
 		t.Error("incomplete group enrichment changed location")
 	}
 	if users["same@example.invalid"].Action != "noop" {
 		t.Errorf("same user action = %q, want noop", users["same@example.invalid"].Action)
 	}
-	if users["gone@example.invalid"].Action != "disable" {
-		t.Errorf("absent user action = %q, want disable", users["gone@example.invalid"].Action)
+	if users["gone@example.invalid"].Action != planner.UserMoveDepartment {
+		t.Errorf("absent user action = %q, want move_department", users["gone@example.invalid"].Action)
 	}
+	if current := users["gone@example.invalid"].Current; current == nil || *current != input.TargetUsers["gone@example.invalid"] {
+		t.Fatalf("absent user lost current snapshot: %#v", current)
+	}
+
 	if _, exists := users["done@example.invalid"]; exists {
-		t.Error("already-disabled absent user produced a plan")
+		t.Error("absent user already in configured department produced a plan")
 	}
 }
 

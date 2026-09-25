@@ -168,6 +168,12 @@ func TestApplySkipsAssignmentWhenCreatedUserIsUnavailable(t *testing.T) {
 	if result.AssetsApplied != 1 || len(result.Failures) != 2 {
 		t.Fatalf("apply result = %#v", result)
 	}
+	if got := result.Assets[0]; got.Patch.Status != "applied" || got.Checkin.Status != "blocked" || got.Checkout.Status != "blocked" {
+		t.Fatalf("partial asset writes = %#v", got)
+	}
+	if result.Users[0].Status != "failed" {
+		t.Fatalf("user outcome = %#v", result.Users[0])
+	}
 	want := []string{"create-user", "patch-asset:1", "checkin-asset:2"}
 	if !reflect.DeepEqual(target.calls, want) {
 		t.Errorf("target calls = %#v, want %#v", target.calls, want)
@@ -207,6 +213,9 @@ func TestInterruptedApplyRetainsCompletedAssets(t *testing.T) {
 	result, err := service.apply(ctx, plan, target.snapshot)
 	if !errors.Is(err, context.Canceled) || result.AssetsApplied != 1 {
 		t.Fatalf("result = %#v, error = %v", result, err)
+	}
+	if result.Assets[0].Patch.Status != "applied" || result.Assets[1].Checkin.Status != "not_attempted" {
+		t.Fatalf("interrupted outcomes = %#v", result.Assets)
 	}
 	if !strings.Contains(diagnostics.String(), `"current":1,"total":2`) || strings.Contains(diagnostics.String(), `"current":2,"total":2`) || !strings.Contains(diagnostics.String(), `"serial":"SERIAL-1"`) || strings.Contains(diagnostics.String(), `"serial":"SERIAL-2"`) {
 		t.Fatalf("completion logs = %s", diagnostics.String())
@@ -249,9 +258,10 @@ func (f *fakeSource) ListDevices(context.Context) ([]domain.Device, error) {
 }
 
 type fakeTarget struct {
-	snapshot  *TargetSnapshot
-	calls     []string
-	createErr error
+	snapshot    *TargetSnapshot
+	calls       []string
+	createErr   error
+	checkoutErr error
 }
 
 func fixtureTarget() *fakeTarget {
@@ -289,7 +299,7 @@ func (f *fakeTarget) CheckinAsset(_ context.Context, assetID int64) error {
 
 func (f *fakeTarget) CheckoutAsset(_ context.Context, assetID, userID int64, _ time.Time, _ *time.Location) error {
 	f.calls = append(f.calls, "checkout-asset:"+strconv.FormatInt(assetID, 10)+":user:"+strconv.FormatInt(userID, 10))
-	return nil
+	return f.checkoutErr
 }
 
 func newTestService(t *testing.T, identity IdentitySource, sources []DeviceSource, target Target) *Service {
@@ -345,3 +355,81 @@ assets:
     writable: [Ready]
   managed_by_field: Managed By
 `
+
+func TestCheckoutFailureRetainsSuccessfulPatchAndCheckin(t *testing.T) {
+	target := fixtureTarget()
+	target.snapshot.Users["person@example.invalid"] = domain.TargetUser{ID: 12}
+	target.checkoutErr = errors.New("checkout rejected")
+	service := newTestService(t, &fakeIdentity{}, []DeviceSource{&fakeSource{name: "primary"}}, target)
+	plan := planner.Plan{Assets: []planner.AssetPlan{{
+		Result: planner.AssetChange, AssetID: 1, SerialNumber: "SERIAL-1", Patch: domain.AssetPatch{Name: new("NEW")},
+		Checkin: true, CheckoutUser: "person@example.invalid",
+	}}}
+	result, err := service.apply(t.Context(), plan, target.snapshot)
+	if err == nil || result.AssetsApplied != 0 {
+		t.Fatalf("result = %#v, error = %v", result, err)
+	}
+	got := result.Assets[0]
+	if got.Patch.Status != "applied" || got.Checkin.Status != "applied" || got.Checkout.Status != "failed" || got.Checkout.Error != "checkout rejected" {
+		t.Fatalf("outcomes = patch %v, checkin %v, checkout %v", got.Patch, got.Checkin, got.Checkout)
+	}
+	want := []string{"patch-asset:1", "checkin-asset:1", "checkout-asset:1:user:12"}
+	if !reflect.DeepEqual(target.calls, want) {
+		t.Fatalf("writes = %v, want %v", target.calls, want)
+	}
+}
+
+func TestCancellationAfterPatchRetainsUnattemptedAssignment(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	target := &cancellingTarget{fakeTarget: fixtureTarget(), cancel: cancel}
+	target.snapshot.Users["person@example.invalid"] = domain.TargetUser{ID: 12}
+	service := newTestService(t, &fakeIdentity{}, []DeviceSource{&fakeSource{name: "primary"}}, target)
+	plan := planner.Plan{Assets: []planner.AssetPlan{{
+		Result: planner.AssetChange, AssetID: 1, SerialNumber: "SERIAL-1", Patch: domain.AssetPatch{Name: new("NEW")},
+		Checkin: true, CheckoutUser: "person@example.invalid",
+	}}}
+	result, err := service.apply(ctx, plan, target.snapshot)
+	if !errors.Is(err, context.Canceled) || result.AssetsApplied != 0 {
+		t.Fatalf("result = %#v, error = %v", result, err)
+	}
+	got := result.Assets[0]
+	if got.Patch.Status != "applied" || got.Checkin.Status != "not_attempted" || got.Checkout.Status != "not_attempted" {
+		t.Fatalf("outcomes = patch %v, checkin %v, checkout %v", got.Patch, got.Checkin, got.Checkout)
+	}
+	if !reflect.DeepEqual(target.calls, []string{"patch-asset:1"}) {
+		t.Fatalf("writes = %v", target.calls)
+	}
+}
+
+func TestCancelledApplyLeavesAllUsersUnattempted(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	target := fixtureTarget()
+	service := newTestService(t, &fakeIdentity{}, []DeviceSource{&fakeSource{name: "primary"}}, target)
+	plan := planner.Plan{Users: []planner.UserPlan{{Action: planner.UserCreate, Email: "new@example.invalid"}, {Action: planner.UserUpdate, Email: "existing@example.invalid"}}}
+	result, err := service.apply(ctx, plan, target.snapshot)
+	if !errors.Is(err, context.Canceled) || len(target.calls) != 0 {
+		t.Fatalf("error = %v; writes = %v", err, target.calls)
+	}
+	for _, user := range result.Users {
+		if user.Status != "not_attempted" {
+			t.Fatalf("unattempted user = %#v", user)
+		}
+	}
+}
+
+func TestPlanningFailureRetainsEnrichmentWarning(t *testing.T) {
+	target := fixtureTarget()
+	target.snapshot.Departments = nil
+	service := newTestService(t, &fakeIdentity{warnings: []string{"Group enrichment unavailable"}}, []DeviceSource{&fakeSource{name: "primary"}}, target)
+	var logs bytes.Buffer
+	service.logger = slog.New(slog.NewJSONHandler(&logs, nil))
+	result, err := service.Reconcile(t.Context(), false)
+	if err == nil || result.Plan != nil {
+		t.Fatalf("result = %#v, error = %v", result, err)
+	}
+	if strings.Count(logs.String(), "Group enrichment unavailable") != 1 {
+		t.Fatalf("enrichment warning lost: %s", &logs)
+	}
+}

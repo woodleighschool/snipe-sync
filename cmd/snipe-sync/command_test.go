@@ -86,3 +86,20 @@ assets:
     writable: [Ready]
   managed_by_field: Managed By
 `
+
+func TestValidateJSONProducesOneResult(t *testing.T) {
+	path := writeCommandConfig(t, t.TempDir(), "config.yaml", commandConfig)
+	command, diagnostics := newRootCommand()
+	var output, stderr bytes.Buffer
+	command.SetOut(&output)
+	command.SetErr(&stderr)
+	command.SetArgs([]string{"validate", "--config", path, "--json"})
+	executed, err := command.ExecuteC()
+	diagnostics.finish(executed, err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if output.String() != "{\"valid\":true}\n" || stderr.Len() != 0 {
+		t.Fatalf("stdout = %s, stderr = %s", &output, &stderr)
+	}
+}

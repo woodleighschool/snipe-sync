@@ -8,13 +8,14 @@ import (
 	"golang.org/x/term"
 )
 
+// textStyle colours terminal output; other writers receive plain text.
 type textStyle struct {
 	enabled bool
 }
 
 func terminalOutput(out io.Writer) bool {
-	if report, ok := out.(reportWriter); ok {
-		out = report.Writer
+	if writer, ok := out.(reportWriter); ok {
+		out = writer.Writer
 	}
 	file, ok := out.(*os.File)
 	return ok && term.IsTerminal(int(file.Fd())) && os.Getenv("TERM") != "dumb"
@@ -25,7 +26,7 @@ func newTextStyle(out io.Writer) textStyle {
 }
 
 func (s textStyle) paint(text string, attributes ...color.Attribute) string {
-	if !s.enabled {
+	if !s.enabled || text == "" {
 		return text
 	}
 	style := color.New(attributes...)

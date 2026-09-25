@@ -82,7 +82,7 @@ type LocationCase struct {
 	Value string `yaml:"value"`
 }
 
-// UserAbsent defines how internal target users absent from Entra are disabled.
+// UserAbsent selects the department for internal target users absent from Entra.
 type UserAbsent struct {
 	Department string `yaml:"department"`
 }

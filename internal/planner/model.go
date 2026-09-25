@@ -11,10 +11,10 @@ import (
 type UserAction string
 
 const (
-	UserCreate  UserAction = "create"
-	UserUpdate  UserAction = "update"
-	UserDisable UserAction = "disable"
-	UserNoop    UserAction = "noop"
+	UserCreate         UserAction = "create"
+	UserUpdate         UserAction = "update"
+	UserMoveDepartment UserAction = "move_department"
+	UserNoop           UserAction = "noop"
 )
 
 // AssetResult identifies whether an asset changes, remains unchanged, or is skipped.
@@ -28,10 +28,11 @@ const (
 
 // UserPlan is one complete target user decision.
 type UserPlan struct {
-	Email    string           `json:"email"`
-	Action   UserAction       `json:"action"`
-	TargetID int64            `json:"target_id,omitempty"`
-	Patch    domain.UserPatch `json:"patch"`
+	Email    string             `json:"email"`
+	Action   UserAction         `json:"action"`
+	TargetID int64              `json:"target_id,omitempty"`
+	Patch    domain.UserPatch   `json:"patch"`
+	Current  *domain.TargetUser `json:"current,omitempty"`
 }
 
 // AssetPlan is one complete target asset decision.
@@ -72,7 +73,7 @@ type Plan struct {
 
 // UserCounts summarizes plan actions.
 func (p Plan) UserCounts() map[UserAction]int {
-	counts := map[UserAction]int{UserCreate: 0, UserUpdate: 0, UserDisable: 0, UserNoop: 0}
+	counts := map[UserAction]int{UserCreate: 0, UserUpdate: 0, UserMoveDepartment: 0, UserNoop: 0}
 	for _, user := range p.Users {
 		counts[user.Action]++
 	}

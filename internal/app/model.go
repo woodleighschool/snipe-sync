@@ -50,9 +50,33 @@ type Failure struct {
 
 // ApplyResult summarizes writes attempted from one immutable plan.
 type ApplyResult struct {
-	UsersApplied  int       `json:"users_applied"`
-	AssetsApplied int       `json:"assets_applied"`
-	Failures      []Failure `json:"failures,omitempty"`
+	UsersApplied  int           `json:"users_applied"`
+	AssetsApplied int           `json:"assets_applied"`
+	Failures      []Failure     `json:"failures,omitempty"`
+	Users         []UserResult  `json:"users"`
+	Assets        []AssetResult `json:"assets"`
+}
+
+// OperationResult records an API outcome, without implying a subsequent readback.
+// Unattempted operations have not started; blocked operations have a failed prerequisite.
+type OperationResult struct {
+	Status string `json:"status"`
+	Error  string `json:"error,omitempty"`
+}
+
+// UserResult records the create or patch request for one user.
+type UserResult struct {
+	Email     string `json:"email"`
+	Operation string `json:"operation"`
+	OperationResult
+}
+
+// AssetResult retains each requested write, including successful partial changes.
+type AssetResult struct {
+	SerialNumber string           `json:"serial_number"`
+	Patch        *OperationResult `json:"patch,omitempty"`
+	Checkin      *OperationResult `json:"checkin,omitempty"`
+	Checkout     *OperationResult `json:"checkout,omitempty"`
 }
 
 // Result combines a complete plan with the outcome of applying it.

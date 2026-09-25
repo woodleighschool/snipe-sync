@@ -190,7 +190,7 @@ func (p *Planner) planUsers(users []domain.User, targetUsers map[string]domain.T
 		if !patch.Empty() {
 			action = UserUpdate
 		}
-		plans = append(plans, UserPlan{Email: user.UserPrincipalName, Action: action, TargetID: target.ID, Patch: patch})
+		plans = append(plans, UserPlan{Email: user.UserPrincipalName, Action: action, TargetID: target.ID, Patch: patch, Current: &target})
 	}
 	targetEmails := make([]string, 0, len(targetUsers))
 	for email := range targetUsers {
@@ -207,7 +207,7 @@ func (p *Planner) planUsers(users []domain.User, targetUsers map[string]domain.T
 		}
 		departmentID := p.disabledDepartmentID
 		plans = append(plans, UserPlan{
-			Email: email, Action: UserDisable, TargetID: target.ID,
+			Email: email, Action: UserMoveDepartment, TargetID: target.ID, Current: &target,
 			Patch: domain.UserPatch{DepartmentID: &departmentID},
 		})
 	}

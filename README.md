@@ -67,26 +67,29 @@ docker run --rm \
   ghcr.io/woodleighschool/snipe-sync:rolling
 ```
 
-Stages and diagnostics go to stderr; reports go to stdout. Finite commands show
-indented operation rows beneath a reconciliation heading, with measured counts where available and a spinner for
-waiting work. Completed results remain in scrollback. Colours respect `NO_COLOR`.
-Successful operation trees collapse to their heading; failures remain expanded.
-Redirected output and CI use log lines, with intermediate progress at debug level. `--no-progress` disables animation. `--quiet` (`-q`) keeps warnings and errors;
-`--verbose` (`-v`) and `--debug` (`-d`) enable debug diagnostics. Use `--log-level
-debug|info|warn|error` for an explicit threshold. Log levels leave reports intact.
-`--output text` (default) writes a readable report. `--output json` writes one report object, including partial results and an `error`
-when execution fails. `--log-format json` writes JSON diagnostic records.
+Finite commands write one report to stdout. A suitable stderr terminal shows
+active operations after a short delay, with counts and bars for known totals.
+Completed activity disappears before the report. JSON, CI and dumb terminals
+suppress progress; `--no-progress` disables it explicitly. `NO_COLOR` controls
+colour. Warnings and a concise failure diagnostic go to stderr.
 
-`run` defaults to JSON diagnostics with no animation. Startup, shutdown and
-material changes use `info`; routine stages and unchanged cycles use `debug`.
-`--log-format text` selects readable service logs. Cycles continue after failures;
-`apply` exits unsuccessfully when its cycle fails.
+`plan`, `apply`, and `validate` accept `--json` for one final JSON document. An apply
+report retains partial results and an `error` when execution fails. Failures before
+a result is available leave stdout empty. `--all` includes unchanged users and
+assets in human output. JSON includes every user and asset in scope; totals
+always describe the whole reconciliation.
+
+`run` always writes JSON logs to stderr and produces no report or terminal display.
+Startup, shutdown and material changes use `info`; routine stages and unchanged
+cycles use `debug`. Its `--log-level debug|info|warn|error` flag overrides the
+configured level. Cycles continue after failures; `apply` exits unsuccessfully
+when its cycle fails.
 
 ## ⚙️ Configuration
 
 Configuration is strict and versioned. Unknown fields, missing references, ambiguous Snipe metadata, unset environment placeholders, and invalid CEL expressions fail before reconciliation. Mappings merge recursively; lists and scalar values replace earlier values. Environment placeholders must occupy the whole value, such as `${SNIPEIT_API_KEY}`.
 
-Runtime settings resolve from `SNIPE_SYNC_*` environment variables, then the corresponding YAML value, then the default. Explicit CLI logging flags override the configured log level.
+Runtime settings resolve from `SNIPE_SYNC_*` environment variables, then the corresponding YAML value, then the default. `run --log-level` overrides the configured log level. These log settings apply to `run`; finite commands always retain warnings.
 
 | Environment variable                 | YAML fallback             | Default |
 | ------------------------------------ | ------------------------- | ------- |
@@ -100,7 +103,7 @@ Runtime settings resolve from `SNIPE_SYNC_*` environment variables, then the cor
 | `devices`     | Intune and Jamf sources, precedence, and managed-by text |
 | `target`      | Snipe-IT connection and checkout timezone                |
 | `reconcile`   | Interval between completed reconciliation cycles         |
-| `users`       | Selection, location, and disabled-user policy            |
+| `users`       | Selection, location, and absent-user department policy   |
 | `assets`      | Eligibility, status, assignment, and absence policy      |
 
 User selection, first-match location rules, and asset field skip rules use typed CEL expressions. Each `assets.skip` rule has a `when` condition and one or more `fields`: `name`, `managed_by`, or `assignment`. Matching rules suppress only fields that would otherwise change. Human-readable Snipe departments, locations, manufacturers, statuses, and the managed-by custom-field label are resolved from each complete target snapshot. Numeric IDs and generated custom-field column names do not belong in configuration.
@@ -113,9 +116,14 @@ The process bootstraps a complete Entra user snapshot with a delta query, then a
 
 Intune, Jamf, and Snipe-IT remain complete bulk snapshots each cycle. Cycles run serially, and the poll interval starts after a cycle finishes. If any configured source fails or returns an incomplete page set, that cycle performs no writes.
 
-Users are created first, followed by updates and disables. IDs returned for new users are then available to asset assignment. All asset patches complete before check-ins begin, and all check-ins complete before checkouts begin. An item failure stops later actions for that asset while independent items continue.
+Users are created first, followed by updates and department moves for absent users. An absent-user department move does not disable the account. IDs returned for new users are then available to asset assignment. All asset patches complete before check-ins begin, and all check-ins complete before checkouts begin. An item failure stops later actions for that asset while independent items continue.
 
-Human plans include user counts and device rows that change or require attention. Use `plan --all` to include unchanged devices. JSON output always contains the complete structured plan.
+Reports show individual user field changes and asset patch, check-in, and checkout
+operations. Apply outcomes distinguish `applied`, `failed`, `blocked`, and `not_attempted`.
+`applied` means the API call succeeded; the command does not read back the result.
+A blocked operation has a failed prerequisite; `not_attempted` operations did not
+start before the run stopped. Successful partial writes remain visible when
+a later assignment fails or the run is interrupted.
 
 ## 🧑‍💻 Development
 

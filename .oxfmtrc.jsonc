@@ -1,4 +1,9 @@
 {
-  "ignorePatterns": ["snipe-sync.schema.json"],
+  "ignorePatterns": [
+    "CHANGELOG.md",
+    ".release-please-manifest.json",
+    ".mise/locks/",
+    "snipe-sync.schema.json",
+  ],
   "printWidth": 100,
 }

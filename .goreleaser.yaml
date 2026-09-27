@@ -6,6 +6,7 @@ project_name: snipe-sync
 before:
   hooks:
     - go mod tidy
+    - mise run notices
 
 builds:
   - id: snipe-sync
@@ -42,6 +43,13 @@ archives:
         formats:
           - zip
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - third_party_licenses/**/*
+      - src: "{{ .Env.GOROOT }}/LICENSE"
+        dst: third_party_licenses/go
+        strip_parent: true
 
 checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"

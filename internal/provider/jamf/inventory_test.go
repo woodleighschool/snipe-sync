@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -170,98 +171,59 @@ func TestListMobileDevicesUsesV2BulkInventoryAndSkipsUnsupportedPlatforms(t *tes
 	}
 }
 
-func TestInventoryRejectsPartialPagination(t *testing.T) {
-	t.Parallel()
-	for _, test := range []struct {
-		name string
-		path string
-		list func(*Client) error
-	}{
-		{
-			name: "computers",
-			path: "/api/v4/computers-inventory",
-			list: func(client *Client) error {
-				_, err := client.ListComputers(context.Background(), "jamf")
-				return err
-			},
-		},
-		{
-			name: "mobile devices",
-			path: "/api/v2/mobile-devices/detail",
-			list: func(client *Client) error {
-				_, err := client.ListMobileDevices(context.Background(), "jamf")
-				return err
-			},
-		},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			server := newAuthenticatedServer(t, func(response http.ResponseWriter, request *http.Request) {
-				if request.URL.Path != test.path {
-					t.Fatalf("path = %q, want %q", request.URL.Path, test.path)
-				}
-				writeJSON(t, response, http.StatusOK, map[string]any{"totalCount": 2, "results": []any{}})
-			})
-			defer server.Close()
-
-			client := newClient(server.URL, "fixture-client", "fixture-secret", server.Client(), time.Now)
-			err := test.list(client)
-			if err == nil || !strings.Contains(err.Error(), "ended at 0 of 2 records") {
-				t.Fatalf("inventory error = %v, want partial-pagination error", err)
-			}
-		})
-	}
-}
-
-func TestInventoryRejectsMissingEnvelope(t *testing.T) {
-	t.Parallel()
-	for _, test := range []struct {
-		name string
-		path string
-		list func(*Client) error
-	}{
-		{
-			name: "computers",
-			path: "/api/v4/computers-inventory",
-			list: func(client *Client) error {
-				_, err := client.ListComputers(context.Background(), "jamf")
-				return err
-			},
-		},
-		{
-			name: "mobile devices",
-			path: "/api/v2/mobile-devices/detail",
-			list: func(client *Client) error {
-				_, err := client.ListMobileDevices(context.Background(), "jamf")
-				return err
-			},
-		},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			server := newAuthenticatedServer(t, func(response http.ResponseWriter, request *http.Request) {
-				if request.URL.Path != test.path {
-					t.Fatalf("path = %q, want %q", request.URL.Path, test.path)
-				}
-				writeJSON(t, response, http.StatusOK, map[string]any{})
-			})
-			defer server.Close()
-
-			client := newClient(server.URL, "fixture-client", "fixture-secret", server.Client(), time.Now)
-			err := test.list(client)
-			if err == nil || !strings.Contains(err.Error(), "totalCount and results are required") {
-				t.Fatalf("inventory error = %v, want missing-envelope error", err)
-			}
-		})
-	}
-}
-
 func assertQueryValues(t *testing.T, request *http.Request, want map[string][]string) {
 	t.Helper()
 	query := request.URL.Query()
 	for key, wantValues := range want {
 		if got := query[key]; !reflect.DeepEqual(got, wantValues) {
 			t.Errorf("query %s = %#v, want %#v", key, got, wantValues)
+		}
+	}
+}
+
+func TestInventoryRejectsIncompleteSnapshots(t *testing.T) {
+	t.Parallel()
+	for _, endpoint := range []struct {
+		name string
+		id   string
+		list func(*Client, context.Context, string) ([]domain.Device, error)
+	}{
+		{"computers", "id", (*Client).ListComputers},
+		{"mobile devices", "mobileDeviceId", (*Client).ListMobileDevices},
+	} {
+		for _, test := range []struct {
+			name  string
+			pages []string
+			want  string
+		}{
+			{"missing envelope", []string{`{}`}, "required"},
+			{"null results", []string{`{"totalCount":0,"results":null}`}, "required"},
+			{"early end", []string{`{"totalCount":2,"results":[{"%s":"1"}]}`, `{"totalCount":2,"results":[]}`}, "ended at"},
+			{"changed total", []string{`{"totalCount":2,"results":[{"%s":"1"}]}`, `{"totalCount":3,"results":[{"%s":"2"}]}`}, "total changed"},
+			{"invalid total", []string{`{"totalCount":-1,"results":[]}`}, "invalid total"},
+			{"excess records", []string{`{"totalCount":0,"results":[{"%s":"1"}]}`}, "invalid total"},
+			{"missing ID", []string{`{"totalCount":1,"results":[{}]}`}, "ID is required"},
+			{"repeated page", []string{`{"totalCount":2,"results":[{"%s":"1"}]}`, `{"totalCount":2,"results":[{"%s":"1"}]}`}, "duplicated"},
+		} {
+			t.Run(endpoint.name+"/"+test.name, func(t *testing.T) {
+				t.Parallel()
+				server := newAuthenticatedServer(t, func(w http.ResponseWriter, r *http.Request) {
+					page, err := strconv.Atoi(r.URL.Query().Get("page"))
+					if err != nil || page < 0 || page >= len(test.pages) {
+						t.Errorf("unexpected page %q", r.URL.Query().Get("page"))
+						w.WriteHeader(http.StatusBadRequest)
+						return
+					}
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = w.Write([]byte(strings.ReplaceAll(test.pages[page], "%s", endpoint.id)))
+				})
+				defer server.Close()
+				client := newClient(server.URL, "fixture-client", "fixture-secret", server.Client(), time.Now)
+				devices, err := endpoint.list(client, t.Context(), "jamf")
+				if err == nil || !strings.Contains(err.Error(), test.want) || devices != nil {
+					t.Fatalf("inventory = %v, %v; want no snapshot and %q error", devices, err, test.want)
+				}
+			})
 		}
 	}
 }

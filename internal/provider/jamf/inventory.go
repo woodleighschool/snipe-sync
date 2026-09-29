@@ -28,6 +28,7 @@ func (c *Client) ListComputers(ctx context.Context, source string) ([]domain.Dev
 		return nil, err
 	}
 	var devices []domain.Device
+	ids := make(map[string]struct{})
 	total := -1
 	for page := 0; ; page++ {
 		query := inventoryQuery(page, "GENERAL", "HARDWARE", "OPERATING_SYSTEM", "USER_AND_LOCATION")
@@ -43,7 +44,7 @@ func (c *Client) ListComputers(ctx context.Context, source string) ([]domain.Dev
 		if result.TotalCount == nil || result.Results == nil {
 			return nil, fmt.Errorf("decode Jamf computers: totalCount and results are required")
 		}
-		pageTotal, results := *result.TotalCount, *result.Results
+		pageTotal, results := *result.TotalCount, result.Results
 		if err := validatePage("computers", total, pageTotal, len(devices), len(results)); err != nil {
 			return nil, err
 		}
@@ -51,6 +52,13 @@ func (c *Client) ListComputers(ctx context.Context, source string) ([]domain.Dev
 			total = pageTotal
 		}
 		for _, computer := range results {
+			if computer.ID == "" {
+				return nil, fmt.Errorf("jamf computer ID is required")
+			}
+			if _, exists := ids[computer.ID]; exists {
+				return nil, fmt.Errorf("jamf computer ID %q is duplicated", computer.ID)
+			}
+			ids[computer.ID] = struct{}{}
 			devices = append(devices, computer.device(source))
 		}
 		if len(devices) == total {
@@ -66,6 +74,7 @@ func (c *Client) ListMobileDevices(ctx context.Context, source string) ([]domain
 		return nil, err
 	}
 	var devices []domain.Device
+	ids := make(map[string]struct{})
 	seen := 0
 	total := -1
 	for page := 0; ; page++ {
@@ -83,7 +92,7 @@ func (c *Client) ListMobileDevices(ctx context.Context, source string) ([]domain
 		if result.TotalCount == nil || result.Results == nil {
 			return nil, fmt.Errorf("decode Jamf mobile devices: totalCount and results are required")
 		}
-		pageTotal, results := *result.TotalCount, *result.Results
+		pageTotal, results := *result.TotalCount, result.Results
 		if err := validatePage("mobile devices", total, pageTotal, seen, len(results)); err != nil {
 			return nil, err
 		}
@@ -92,6 +101,13 @@ func (c *Client) ListMobileDevices(ctx context.Context, source string) ([]domain
 		}
 		seen += len(results)
 		for _, mobile := range results {
+			if mobile.MobileDeviceID == "" {
+				return nil, fmt.Errorf("jamf mobile device ID is required")
+			}
+			if _, exists := ids[mobile.MobileDeviceID]; exists {
+				return nil, fmt.Errorf("jamf mobile device ID %q is duplicated", mobile.MobileDeviceID)
+			}
+			ids[mobile.MobileDeviceID] = struct{}{}
 			if !strings.EqualFold(mobile.DeviceType, "ios") {
 				continue
 			}
@@ -118,8 +134,8 @@ func validatePage(kind string, expectedTotal, total, seen, pageRows int) error {
 }
 
 type computerSearchResult struct {
-	TotalCount *int              `json:"totalCount"`
-	Results    *[]computerRecord `json:"results"`
+	TotalCount *int             `json:"totalCount"`
+	Results    []computerRecord `json:"results"`
 }
 
 type computerRecord struct {
@@ -167,8 +183,8 @@ func (r computerRecord) device(source string) domain.Device {
 }
 
 type mobileSearchResult struct {
-	TotalCount *int            `json:"totalCount"`
-	Results    *[]mobileRecord `json:"results"`
+	TotalCount *int           `json:"totalCount"`
+	Results    []mobileRecord `json:"results"`
 }
 
 type mobileRecord struct {

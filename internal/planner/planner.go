@@ -442,11 +442,11 @@ func appendPlanNote(current, note string) string {
 }
 
 func (p *Planner) internalEmail(email string) bool {
-	separator := strings.LastIndexByte(email, '@')
-	if separator < 0 {
+	_, after, ok0 := strings.CutLast(email, "@")
+	if !ok0 {
 		return false
 	}
-	_, ok := p.domains[email[separator+1:]]
+	_, ok := p.domains[after]
 	return ok
 }
 

@@ -41,7 +41,7 @@ func TestWriteHumanPlanShowsChangesAndSkippedAssets(t *testing.T) {
 	for _, want := range []string{
 		"Users: 1 total; 1 create, 0 update, 0 move department, 0 unchanged",
 		"User new@example.invalid: create", "Asset SERIAL-1 (primary): change",
-		`name: "OLD" -> "NEW"`, `assignment: "old@example.invalid" -> ""`, "patch: planned", "checkin: planned", "checkout: planned",
+		`name: "OLD" → "NEW"`, `assignment: "old@example.invalid" → ""`, "patch: planned", "checkin: planned", "checkout: planned",
 		"Reason: missing in Snipe",
 		"SERIAL-4", "Note: primary user unresolved; checkout preserved",
 		"Assets: 4 total; 1 change, 2 unchanged, 1 skipped",
@@ -150,7 +150,7 @@ func TestReportShowsPartialWritesAndSafeUserDiffs(t *testing.T) {
 			}
 			continue
 		}
-		for _, want := range []string{"move department (absent from source)", `department_id: 5 -> 17`, `given_name: "Old" -> "New\n\x1b[31mé"`, "patch: applied", "checkin: applied", "checkout: failed (request rejected)", "patch: not attempted", "Warning: Enrichment unavailable"} {
+		for _, want := range []string{"move department (absent from source)", `department_id: 5 → 17`, `given_name: "Old" → "New\n\x1b[31mé"`, "patch: applied", "checkin: applied", "checkout: failed (request rejected)", "patch: not attempted", "! Enrichment unavailable"} {
 			if !strings.Contains(output.String(), want) {
 				t.Errorf("report missing %q: %s", want, &output)
 			}
@@ -173,12 +173,9 @@ func TestCreatedUsersShowInitialValues(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{`given_name: "New"`, `email: "new@example.invalid"`, "department_id: 17"} {
-		if !strings.Contains(output.String(), want) {
+		if !strings.Contains(output.String(), "\n    "+want+"\n") {
 			t.Errorf("missing initial value %q: %s", want, &output)
 		}
-	}
-	if strings.Contains(output.String(), " -> ") {
-		t.Fatalf("create invented before values: %s", &output)
 	}
 }
 

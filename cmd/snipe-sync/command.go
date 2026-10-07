@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
 	"github.com/woodleighschool/snipe-sync/internal/app"
@@ -33,7 +34,7 @@ func newRootCommand() (*cobra.Command, *commandOutput) {
 	command.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
 		return output.start(cmd)
 	}
-	command.SetVersionTemplate(fmt.Sprintf("snipe-sync %s\ncommit: %s\nbuilt: %s\n", version, commit, date))
+	command.SetVersionTemplate(fmt.Sprintf("snipe-sync %s (commit %s, built %s)\n", version, commit, date))
 	command.PersistentFlags().Bool("no-progress", false, "Disable terminal progress")
 	command.PersistentFlags().StringArrayVar(
 		&c.configPaths,
@@ -75,7 +76,7 @@ func (c *cli) validateCommand() *cobra.Command {
 					Valid bool `json:"valid"`
 				}{true})
 			}
-			_, err := fmt.Fprintln(command.OutOrStdout(), "configuration valid")
+			_, err := fmt.Fprintln(command.OutOrStdout(), newTextStyle(command.OutOrStdout()).paint("✓ Configuration is valid.", color.FgHiGreen))
 			return err
 		},
 	}
@@ -166,7 +167,7 @@ func newVersionCommand() *cobra.Command {
 		Short: "Show version information",
 		Args:  cobra.NoArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
-			_, err := fmt.Fprintf(command.OutOrStdout(), "snipe-sync %s\ncommit: %s\nbuilt: %s\n", version, commit, date)
+			_, err := fmt.Fprintf(command.OutOrStdout(), "snipe-sync %s (commit %s, built %s)\n", version, commit, date)
 			return err
 		},
 	}

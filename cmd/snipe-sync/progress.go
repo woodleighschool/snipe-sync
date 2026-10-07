@@ -221,10 +221,10 @@ func (p *terminalProgress) draw(now time.Time) {
 		line := cleanLine(row.label)
 
 		if row.detail != "" {
-			line += " · " + cleanLine(row.detail)
+			line += ": " + cleanLine(row.detail)
 		}
 		if row.total > 0 {
-			line += fmt.Sprintf(" · %d / %d %s", row.current, row.total, cleanLine(row.unit))
+			line += fmt.Sprintf(" (%d / %d %s)", row.current, row.total, cleanLine(row.unit))
 		}
 		_, _ = fmt.Fprintf(p.out, "%s (%s)\n", line, now.Sub(row.started).Round(time.Second))
 		row.announced = now
@@ -297,9 +297,13 @@ func progressText(style textStyle, line *progressLine, width int, now time.Time,
 	available := max(0, width-runewidth.StringWidth(indent+mark)-2)
 	measure := func(parts ...segment) int {
 		total := 0
-		for _, part := range parts {
+		for i, part := range parts {
 			if part.plain != "" {
-				total += 2 + runewidth.StringWidth(part.plain)
+				separator := 1
+				if i == 0 {
+					separator = 2
+				}
+				total += separator + runewidth.StringWidth(part.plain)
 			}
 		}
 		return total
@@ -323,15 +327,23 @@ func progressText(style textStyle, line *progressLine, width int, now time.Time,
 		elapsed = segment{}
 	}
 	parts := []segment{faint(detail), bar, counts, elapsed}
-	tail := "..."
-	if available-measure(parts...) < len(tail) {
+	tail := "…"
+	if available-measure(parts...) < runewidth.StringWidth(tail) {
 		tail = ""
 	}
 	var text strings.Builder
-	text.WriteString(indent + style.paint(mark, attribute) + " " + runewidth.Truncate(label, max(0, available-measure(parts...)), tail))
-	for _, part := range parts {
+	text.WriteString(indent)
+	if mark != "" {
+		text.WriteString(style.paint(mark, attribute) + " ")
+	}
+	text.WriteString(runewidth.Truncate(label, max(0, available-measure(parts...)), tail))
+	for i, part := range parts {
 		if part.plain != "" {
-			text.WriteString("  " + part.painted)
+			separator := " "
+			if i == 0 {
+				separator = ": "
+			}
+			text.WriteString(separator + part.painted)
 		}
 	}
 	return text.String()

@@ -32,7 +32,7 @@ func TestFiniteDiagnosticsKeepWarningsWithoutStageLogs(t *testing.T) {
 	if err == nil {
 		t.Fatal("probe succeeded")
 	}
-	if got, want := diagnostics.String(), "Warning: Partial inventory\nError: source failed: HTTP 503\n"; got != want {
+	if got, want := diagnostics.String(), "! Partial inventory\n✗ source failed: HTTP 503\n"; got != want {
 		t.Fatalf("diagnostics = %q, want %q", got, want)
 	}
 	if report.Len() != 0 {
@@ -148,7 +148,7 @@ func TestEarlyJSONFailureDoesNotFabricateReport(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected failure")
 	}
-	if report.Len() != 0 || strings.Count(diagnostics.String(), "Error:") != 1 {
+	if report.Len() != 0 || strings.Count(diagnostics.String(), "✗") != 1 {
 		t.Fatalf("stdout = %s, stderr = %s", &report, &diagnostics)
 	}
 }
@@ -171,7 +171,7 @@ func TestFiniteWarningsIgnoreDaemonLogLevel(t *testing.T) {
 	if err := command.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if diagnostics.String() != "Warning: Enrichment unavailable\n" {
+	if diagnostics.String() != "! Enrichment unavailable\n" {
 		t.Fatalf("warnings: %s", &diagnostics)
 	}
 }
@@ -210,7 +210,7 @@ func TestCancellationIsNotAutomaticallyAnInterrupt(t *testing.T) {
 			cancel(errInterrupted)
 		}
 		output.finish(cmd, context.Canceled)
-		if strings.Contains(logs.String(), "interrupted") != interrupted {
+		if strings.Contains(logs.String(), "– Interrupted.") != interrupted {
 			t.Fatalf("interrupted=%v: %s", interrupted, logs.String())
 		}
 	}

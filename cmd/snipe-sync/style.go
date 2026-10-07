@@ -33,3 +33,7 @@ func (s textStyle) paint(text string, attributes ...color.Attribute) string {
 	style.EnableColor()
 	return style.Sprint(text)
 }
+
+func (s textStyle) heading(text string) string {
+	return s.paint("➤ "+text, color.Bold, color.FgHiMagenta)
+}

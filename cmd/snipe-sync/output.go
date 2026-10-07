@@ -83,9 +83,9 @@ func writeReport(writer io.Writer, jsonOutput, includeUnchanged bool, result app
 	if report.Apply != nil {
 		label = "Apply"
 	}
-	fmt.Fprintln(&text, style.paint(label, color.Bold))
+	fmt.Fprintln(&text, style.heading(label))
 	for _, warning := range plan.Warnings {
-		fmt.Fprintf(&text, "%s %s\n", style.paint("Warning:", color.FgHiYellow), reportText(warning))
+		fmt.Fprintf(&text, "%s %s\n", style.paint("!", color.FgHiYellow), reportText(warning))
 	}
 	userCounts, assetCounts := report.Totals.UserActions, report.Totals.AssetResults
 	fmt.Fprintf(&text, "%s %d total; %d create, %d update, %d move department, %d unchanged\n", style.paint("Users:", color.Bold), report.Totals.Users,
@@ -118,7 +118,7 @@ func writeReport(writer io.Writer, jsonOutput, includeUnchanged bool, result app
 		case planner.UserMoveDepartment:
 			action = "move department (absent from source)"
 		}
-		fmt.Fprintf(&text, "\n%s: %s\n", style.paint("User "+reportText(user.Email), color.Bold), style.paint(action, userColour(user.Action)))
+		fmt.Fprintf(&text, "\n%s: %s\n", style.heading("User "+reportText(user.Email)), style.paint(action, userColour(user.Action)))
 		if user.Action == planner.UserNoop {
 			continue
 		}
@@ -135,7 +135,7 @@ func writeReport(writer io.Writer, jsonOutput, includeUnchanged bool, result app
 		if asset.Result != planner.AssetChange {
 			assetColour = color.Faint
 		}
-		fmt.Fprintf(&text, "\n%s: %s\n", style.paint("Asset "+reportText(asset.SerialNumber)+" ("+reportText(asset.Source)+")", color.Bold), style.paint(string(asset.Result), assetColour))
+		fmt.Fprintf(&text, "\n%s: %s\n", style.heading("Asset "+reportText(asset.SerialNumber)+" ("+reportText(asset.Source)+")"), style.paint(string(asset.Result), assetColour))
 		if asset.SkipReason != "" {
 			fmt.Fprintf(&text, "  Reason: %s\n", reportText(asset.SkipReason))
 		}
@@ -187,19 +187,20 @@ func writeOperation(text *strings.Builder, style textStyle, name string, result 
 	if result.Error != "" {
 		status += " (" + reportText(result.Error) + ")"
 	}
-	fmt.Fprintf(text, "  %s: %s\n", name, style.paint(status, operationColour(result.Status)))
+	mark, attribute := operationStyle(result.Status)
+	fmt.Fprintf(text, "  %s %s: %s\n", style.paint(mark, attribute), name, style.paint(status, attribute))
 }
 
-func operationColour(status string) color.Attribute {
+func operationStyle(status string) (string, color.Attribute) {
 	switch status {
 	case "applied":
-		return color.FgHiGreen
+		return "✓", color.FgHiGreen
 	case "failed":
-		return color.FgHiRed
+		return "✗", color.FgHiRed
 	case "blocked", "not_attempted":
-		return color.FgHiYellow
+		return "–", color.FgHiYellow
 	}
-	return color.Reset
+	return "→", color.FgHiYellow
 }
 
 func userColour(action planner.UserAction) color.Attribute {
@@ -249,14 +250,14 @@ func writeUserFields(text *strings.Builder, user planner.UserPlan) {
 			if user.Action == planner.UserCreate {
 				fmt.Fprintf(text, "    %s: %d\n", field.name, *field.after)
 			} else {
-				fmt.Fprintf(text, "    %s: %d -> %d\n", field.name, field.before, *field.after)
+				fmt.Fprintf(text, "    %s: %d → %d\n", field.name, field.before, *field.after)
 			}
 		}
 	}
 }
 
 func writeField(text *strings.Builder, name, before, after string) {
-	fmt.Fprintf(text, "    %s: %s -> %s\n", name, strconv.Quote(before), strconv.Quote(after))
+	fmt.Fprintf(text, "    %s: %s → %s\n", name, strconv.Quote(before), strconv.Quote(after))
 }
 
 // reportText escapes the characters in one value that could reshape a report

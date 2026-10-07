@@ -73,6 +73,8 @@ Completed activity disappears before the report. JSON, CI and dumb terminals
 suppress progress; `--no-progress` disables it explicitly. `NO_COLOR` controls
 colour. Warnings and a concise failure diagnostic go to stderr.
 
+Human reports use `➤` item headings, `→` for planned operations and field transitions, `✓` for completed operations, `✗` for failures and `–` for operations not attempted. Each operation keeps its own outcome. Warnings use `!`; details use indented `label: value` lines.
+
 `plan`, `apply`, and `validate` accept `--json` for one final JSON document. An apply
 report retains partial results and an `error` when execution fails. Failures before
 a result is available leave stdout empty. `--all` includes unchanged users and

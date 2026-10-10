@@ -1,5 +1,41 @@
 # Changelog
 
+## [2.0.0](https://github.com/woodleighschool/snipe-sync/compare/v1.1.0...v2.0.0) (2026-10-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **cli:** replace --output with --json and remove finite-command logging flags. JSON includes every result in the selected scope. Rename the JSON disable action to move_department.
+* align reconciler commands and output
+
+### Features
+
+* align reconciler commands and output ([4d7d34b](https://github.com/woodleighschool/snipe-sync/commit/4d7d34b41f5d284b4a8a12c40315748e81edc206))
+* **cli:** report user and asset outcomes ([5ac2805](https://github.com/woodleighschool/snipe-sync/commit/5ac2805497e9cabb8baf78bcb54dffa73d0126dd))
+* **go:** update module github.com/dustin/go-humanize (v1.0.1 → v1.1.0) ([#24](https://github.com/woodleighschool/snipe-sync/issues/24)) ([9328ef9](https://github.com/woodleighschool/snipe-sync/commit/9328ef99c4977fafa2bf2695531cf2a2328d9500))
+* **go:** update module github.com/microsoft/kiota-abstractions-go (v1.10.1 → v1.11.0) ([#23](https://github.com/woodleighschool/snipe-sync/issues/23)) ([28717d5](https://github.com/woodleighschool/snipe-sync/commit/28717d52423e4a257fe96af761f3841e15debe7d))
+* **go:** update module github.com/microsoft/kiota-abstractions-go (v1.9.4 → v1.10.0) ([#9](https://github.com/woodleighschool/snipe-sync/issues/9)) ([3d64523](https://github.com/woodleighschool/snipe-sync/commit/3d64523f253b9d7af2da3e7fa85f6caef673dfe4))
+* **go:** update module github.com/microsoftgraph/msgraph-sdk-go (v1.101.0 → v1.102.0) ([#14](https://github.com/woodleighschool/snipe-sync/issues/14)) ([96bcbcd](https://github.com/woodleighschool/snipe-sync/commit/96bcbcd1c6da59eb700950ba046992c1331a2ca9))
+* **go:** update module github.com/microsoftgraph/msgraph-sdk-go (v1.102.0 → v1.103.0) ([#20](https://github.com/woodleighschool/snipe-sync/issues/20)) ([ad0450d](https://github.com/woodleighschool/snipe-sync/commit/ad0450d87cf5b72160be709926a99423352347e1))
+* **go:** update module golang.org/x/sync (v0.22.0 → v0.23.0) ([#17](https://github.com/woodleighschool/snipe-sync/issues/17)) ([a503914](https://github.com/woodleighschool/snipe-sync/commit/a503914207caf9c6f4893e64ca964801175ea38f))
+
+
+### Bug Fixes
+
+* **build:** unify Go toolchain and license tool versions ([3b10145](https://github.com/woodleighschool/snipe-sync/commit/3b101450fbe43533dc018801dd4968c936773a31))
+* **cli:** align terminal output conventions ([25a0eed](https://github.com/woodleighschool/snipe-sync/commit/25a0eede6e61317738ea3b05a3c3ec15dc6b5406))
+* **container:** update image golang (1.27.0 → 1.27.1) ([#13](https://github.com/woodleighschool/snipe-sync/issues/13)) ([e22669e](https://github.com/woodleighschool/snipe-sync/commit/e22669e3b2b6ad6166fbaa9b78c0cad5e6d6d867))
+* **go:** update module charm.land/bubbletea/v2 (v2.0.9 → v2.0.10) ([#29](https://github.com/woodleighschool/snipe-sync/issues/29)) ([d0a15a5](https://github.com/woodleighschool/snipe-sync/commit/d0a15a5cbe35feb56ee3495d02baf657035683e2))
+* **go:** update module github.com/azure/azure-sdk-for-go/sdk/azidentity (v1.14.0 → v1.14.1) ([#8](https://github.com/woodleighschool/snipe-sync/issues/8)) ([a24e379](https://github.com/woodleighschool/snipe-sync/commit/a24e379b4ff7ee42dee65f14f9142afe6d17ac5e))
+* **go:** update module github.com/lmittmann/tint (v1.2.0 → v1.2.1) ([#37](https://github.com/woodleighschool/snipe-sync/issues/37)) ([5a5e181](https://github.com/woodleighschool/snipe-sync/commit/5a5e18182215d14e6239b5e9fb2fd6e5ccae3216))
+* **go:** update module github.com/mattn/go-runewidth (v0.0.30 → v0.0.31) ([#44](https://github.com/woodleighschool/snipe-sync/issues/44)) ([a54cf93](https://github.com/woodleighschool/snipe-sync/commit/a54cf93b069cd864b87efdf690696d548ccd5b00))
+* **go:** update module github.com/microsoft/kiota-abstractions-go (v1.10.0 → v1.10.1) ([#12](https://github.com/woodleighschool/snipe-sync/issues/12)) ([0d6542c](https://github.com/woodleighschool/snipe-sync/commit/0d6542c2369697626ffa464ca46104bf314da4c1))
+* **go:** update module github.com/microsoft/kiota-abstractions-go (v1.11.0 → v1.11.1) ([#28](https://github.com/woodleighschool/snipe-sync/issues/28)) ([00905ae](https://github.com/woodleighschool/snipe-sync/commit/00905ae0b57cd132d2cb9f96f9c916052be98092))
+* **go:** update module github.com/microsoftgraph/msgraph-sdk-go (v1.103.0 → v1.104.0) ([#41](https://github.com/woodleighschool/snipe-sync/issues/41)) ([ff19bcd](https://github.com/woodleighschool/snipe-sync/commit/ff19bcd5c52c13451f8b8f174db14b1c905f8721))
+* **go:** update module golang.org/x/sync (v0.23.0 → v0.24.0) ([#48](https://github.com/woodleighschool/snipe-sync/issues/48)) ([9c2eae3](https://github.com/woodleighschool/snipe-sync/commit/9c2eae31fa3a109a420150e2f6186752308711ac))
+* **go:** update module golang.org/x/term (v0.46.0 → v0.47.0) ([#49](https://github.com/woodleighschool/snipe-sync/issues/49)) ([91d1938](https://github.com/woodleighschool/snipe-sync/commit/91d1938895812a6614755df4a240133c77a006d8))
+* **jamf:** reject incomplete inventory snapshots ([2c9753c](https://github.com/woodleighschool/snipe-sync/commit/2c9753ca1407b564f53a4a4075c5a287723235e9))
+
 ## [1.1.0](https://github.com/woodleighschool/snipe-sync/compare/v1.0.0...v1.1.0) (2026-08-27)
 
 

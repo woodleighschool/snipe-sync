@@ -99,10 +99,10 @@ url_api = "https://api.github.com/repos/evilmartians/lefthook/releases/assets/63
 provenance = "github-attestations"
 
 [[tools."npm:@commitlint/cli"]]
-version = "21.2.3"
-aube = { path = "locks/npm-commitlint-cli/21.2.3", digest = "sha256:8c7adee094a8c509826c562f8bc9904e358c16c06a22c4709c70e21224c763e4" }
+version = "21.2.4"
+aube = { path = "locks/npm-commitlint-cli/21.2.4", digest = "sha256:48fedb46245a75b8595bdadc68ea61f818257ad573d593ea24ba36cc5ec719e9" }
 backend = "npm:@commitlint/cli"
-specifiers = ["21.2.3"]
+specifiers = ["21.2.4"]
 
 [[tools.oxfmt]]
 version = "0.73.0"

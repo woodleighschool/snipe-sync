@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/woodleighschool/snipe-sync/compare/v2.0.0...v2.0.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* **go:** update module github.com/microsoftgraph/msgraph-sdk-go (v1.104.0 → v1.105.0) ([#72](https://github.com/woodleighschool/snipe-sync/issues/72)) ([f367429](https://github.com/woodleighschool/snipe-sync/commit/f367429a510be15180b09579f7ba11f91dc18976))
+
 ## [2.0.0](https://github.com/woodleighschool/snipe-sync/compare/v1.1.0...v2.0.0) (2026-10-22)
 
 

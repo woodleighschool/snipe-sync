@@ -3,7 +3,7 @@ module github.com/woodleighschool/snipe-sync
 go 1.27.0
 
 require (
-	cel.dev/cel-go v0.33.0
+	cel.dev/cel-go v0.33.1
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.15.0
 	github.com/caarlos0/env/v11 v11.4.1
 	github.com/dustin/go-humanize v1.1.0

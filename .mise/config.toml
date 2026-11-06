@@ -21,10 +21,6 @@ run = "go mod download"
 description = "Build application"
 run = "go build -o snipe-sync ./cmd/snipe-sync"
 
-[tasks.notices]
-description = "Collect dependency licenses and notices"
-run = "go-licenses save ./cmd/snipe-sync --save_path third_party_licenses --ignore github.com/woodleighschool/snipe-sync --force"
-
 [tasks.tidy]
 description = "Tidy the Go module"
 run = "go mod tidy"

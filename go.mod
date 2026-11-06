@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	cel.dev/cel-go v0.33.2
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.15.0
-	github.com/caarlos0/env/v11 v11.4.1
+	github.com/caarlos0/env/v11 v11.4.2
 	github.com/dustin/go-humanize v1.1.0
 	github.com/fatih/color v1.19.0
 	github.com/invopop/jsonschema v0.14.0

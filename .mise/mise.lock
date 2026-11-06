@@ -98,12 +98,6 @@ url = "https://github.com/evilmartians/lefthook/releases/download/v2.2.2/lefthoo
 url_api = "https://api.github.com/repos/evilmartians/lefthook/releases/assets/636518817"
 provenance = "github-attestations"
 
-[[tools."npm:@commitlint/cli"]]
-version = "21.2.4"
-aube = { path = "locks/npm-commitlint-cli/21.2.4", digest = "sha256:3e8bf9bc29da282d12eedddab1aa380ebcf937a7b2b6eefb1394a12cb11e7a53" }
-backend = "npm:@commitlint/cli"
-specifiers = ["21.2.4"]
-
 [[tools.oxfmt]]
 version = "0.75.0"
 aube = { path = "locks/oxfmt/0.75.0", digest = "sha256:1d4f470a5dbba272218132db6ff9ba1911075d29dcd3253a0e02b4a5037a8a23" }

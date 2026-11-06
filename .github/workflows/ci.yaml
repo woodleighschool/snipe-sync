@@ -45,7 +45,6 @@ jobs:
       - name: Setup Mise
         uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
-          experimental: true
           install_args: --locked jactionlint
 
       - name: Lint workflows
@@ -69,7 +68,6 @@ jobs:
       - name: Setup Mise
         uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
-          experimental: true
           install_args: --locked go golangci-lint
 
       - name: Cache Go modules and build
@@ -130,7 +128,6 @@ jobs:
       - name: Setup Mise
         uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
-          experimental: true
           install_args: --locked go go:golang.org/x/vuln/cmd/govulncheck
 
       - name: Run govulncheck

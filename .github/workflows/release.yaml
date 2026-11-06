@@ -8,6 +8,7 @@ on:
       - main
     paths-ignore:
       - "**.md"
+      - .release-please-manifest.json
   release:
     types:
       - published
@@ -83,8 +84,29 @@ jobs:
   goreleaser:
     name: GoReleaser
     if: ${{ github.event_name == 'release' }}
-    uses: $/.github/workflows/goreleaser.yaml
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
     permissions:
       contents: write
-    with:
-      snapshot: false
+    env:
+      MISE_NO_HOOKS: "1"
+      MISE_TASK_RUN_AUTO_INSTALL: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Mise
+        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+        with:
+          cache: false
+          install_args: --locked go go:github.com/google/go-licenses/v2
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          args: release --clean --parallelism=2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

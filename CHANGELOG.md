@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.0.1](https://github.com/woodleighschool/snipe-sync/compare/v2.0.0...v2.0.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **go:** update module cel.dev/cel-go (v0.32.0 → v0.33.0) ([#75](https://github.com/woodleighschool/snipe-sync/issues/75)) ([f1091d2](https://github.com/woodleighschool/snipe-sync/commit/f1091d274be65455dde47085fbd5004f00527059))
+* **go:** update module cel.dev/cel-go (v0.33.0 → v0.33.1) ([#77](https://github.com/woodleighschool/snipe-sync/issues/77)) ([72c0184](https://github.com/woodleighschool/snipe-sync/commit/72c018410be9b84bb065de6cf23c35508065cc64))
+* **go:** update module cel.dev/cel-go (v0.33.1 → v0.33.2) ([#83](https://github.com/woodleighschool/snipe-sync/issues/83)) ([9d899bc](https://github.com/woodleighschool/snipe-sync/commit/9d899bc05b783d3af6466f1c1c208d8b6a200c72))
+* **go:** update module github.com/caarlos0/env/v11 (v11.4.1 → v11.4.2) ([#89](https://github.com/woodleighschool/snipe-sync/issues/89)) ([9573c93](https://github.com/woodleighschool/snipe-sync/commit/9573c936fe7f9c4ee27ec5cfb6a192cd48bce58a))
+* **go:** update module github.com/microsoft/kiota-abstractions-go (v1.11.4 → v1.12.0) ([#78](https://github.com/woodleighschool/snipe-sync/issues/78)) ([211b585](https://github.com/woodleighschool/snipe-sync/commit/211b585200f49ba95e380e5d77f0f030585343c0))
+* **go:** update module github.com/microsoft/kiota-abstractions-go (v1.12.0 → v1.12.1) ([#92](https://github.com/woodleighschool/snipe-sync/issues/92)) ([e8c415a](https://github.com/woodleighschool/snipe-sync/commit/e8c415a0867c63bd88bf81bbc71e684f1142b162))
+* **go:** update module github.com/microsoftgraph/msgraph-sdk-go (v1.104.0 → v1.105.0) ([#72](https://github.com/woodleighschool/snipe-sync/issues/72)) ([f367429](https://github.com/woodleighschool/snipe-sync/commit/f367429a510be15180b09579f7ba11f91dc18976))
+* **go:** update module go.yaml.in/yaml/v4 (v4.0.0-rc.6 → v4.0.0-rc.7) ([#85](https://github.com/woodleighschool/snipe-sync/issues/85)) ([656133c](https://github.com/woodleighschool/snipe-sync/commit/656133cf08be3d43ac22aa8e324bd369ada1181a))
+* **go:** update module go.yaml.in/yaml/v4 (v4.0.0-rc.7 → v4.0.0-rc.8) ([#86](https://github.com/woodleighschool/snipe-sync/issues/86)) ([bbd30bc](https://github.com/woodleighschool/snipe-sync/commit/bbd30bc800782d7e64dd8a805e9ea5291ee28ba8))
+* **go:** update module go.yaml.in/yaml/v4 (v4.0.0-rc.8 → v4.0.0-rc.9) ([#88](https://github.com/woodleighschool/snipe-sync/issues/88)) ([22249fe](https://github.com/woodleighschool/snipe-sync/commit/22249fe57f1f820a36cd44554ba5cffe5eb4cd6e))
+* **go:** update module go.yaml.in/yaml/v4 (v4.0.0-rc.9 → v4.0.0) ([#90](https://github.com/woodleighschool/snipe-sync/issues/90)) ([f1f9d1a](https://github.com/woodleighschool/snipe-sync/commit/f1f9d1a3083c4a84510c383fcd9e37c7d062b2f8))
+
 ## [2.0.0](https://github.com/woodleighschool/snipe-sync/compare/v1.1.0...v2.0.0) (2026-10-22)
 
 

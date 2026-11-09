@@ -14,7 +14,7 @@ require (
 	github.com/microsoftgraph/msgraph-sdk-go v1.105.0
 	github.com/spf13/cobra v1.10.2
 	go.yaml.in/yaml/v4 v4.0.0
-	golang.org/x/sync v0.24.0
+	golang.org/x/sync v0.25.0
 	golang.org/x/term v0.47.0
 )
 

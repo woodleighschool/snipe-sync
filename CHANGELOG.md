@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.2](https://github.com/woodleighschool/snipe-sync/compare/v2.0.1...v2.0.2) (2026-11-19)
+
+
+### Bug Fixes
+
+* **go:** update module cel.dev/cel-go (v0.33.2 → v0.33.4) ([#102](https://github.com/woodleighschool/snipe-sync/issues/102)) ([6a03dd6](https://github.com/woodleighschool/snipe-sync/commit/6a03dd62a0501ad46f7b60092ff969be641f4318))
+* **go:** update module github.com/microsoft/kiota-abstractions-go (v1.12.1 → v1.12.2) ([#103](https://github.com/woodleighschool/snipe-sync/issues/103)) ([5f19fe8](https://github.com/woodleighschool/snipe-sync/commit/5f19fe8d976b9f9074741ae97200ceb41a4f8cb3))
+
 ## [2.0.1](https://github.com/woodleighschool/snipe-sync/compare/v2.0.0...v2.0.1) (2026-11-11)
 
 

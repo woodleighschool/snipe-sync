@@ -28,11 +28,10 @@ run = "go mod tidy -diff"
 run = "govulncheck ./..."
 
 [tasks.generate]
-description = "Regenerate the configuration schema"
+description = "Config schema"
 run = "go generate ./internal/config"
 
 [tasks.test]
-description = "Vet Go code and run race-enabled tests"
 run = ["go vet ./...", "go test -race -count=1 ./..."]
 
 [tasks.lint-fix]

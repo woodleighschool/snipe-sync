@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.0.2](https://github.com/woodleighschool/snipe-sync/compare/v2.0.1...v2.0.2) (2026-11-28)
+
+
+### Bug Fixes
+
+* **go:** update module cel.dev/cel-go (v0.33.2 → v0.33.4) ([#102](https://github.com/woodleighschool/snipe-sync/issues/102)) ([6a03dd6](https://github.com/woodleighschool/snipe-sync/commit/6a03dd62a0501ad46f7b60092ff969be641f4318))
+* **go:** update module github.com/microsoft/kiota-abstractions-go (v1.12.1 → v1.12.2) ([#103](https://github.com/woodleighschool/snipe-sync/issues/103)) ([5f19fe8](https://github.com/woodleighschool/snipe-sync/commit/5f19fe8d976b9f9074741ae97200ceb41a4f8cb3))
+* **go:** update module github.com/microsoft/kiota-abstractions-go (v1.12.2 → v1.12.3) ([#111](https://github.com/woodleighschool/snipe-sync/issues/111)) ([9935937](https://github.com/woodleighschool/snipe-sync/commit/9935937a7000f8643bc0a05c12b5ad1276f12d25))
+* **go:** update module github.com/microsoftgraph/msgraph-sdk-go (v1.106.0 → v1.107.0) ([#106](https://github.com/woodleighschool/snipe-sync/issues/106)) ([33b1bbe](https://github.com/woodleighschool/snipe-sync/commit/33b1bbecacc80dd972aae5f7cb58d1888108195b))
+
 ## [2.0.1](https://github.com/woodleighschool/snipe-sync/compare/v2.0.0...v2.0.1) (2026-11-11)
 
 
